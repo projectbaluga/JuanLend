@@ -129,5 +129,59 @@ void main() {
       expect(receipt, contains('₱1,000.00'));
       expect(receipt, contains('GCash'));
     });
+
+    test('ReceiptUtils generates Truth in Lending Disclosure Statement', () {
+      final borrower = Borrower(
+        id: 'bor_1',
+        fullName: 'Maria Santos',
+        email: 'maria@example.com',
+        phone: '09181234567',
+        address: 'Quezon City',
+        idNumber: 'ID456',
+        employment: 'Employed',
+        monthlyIncome: 25000.0,
+        creditScore: 85,
+        riskRating: 'low',
+        notes: '',
+      );
+
+      final schedule = LoanUtils.generateSchedule(10000.0, 12.0, 12, '2026-01-01');
+
+      final loan = Loan(
+        id: 'loan_disc_1',
+        borrowerId: 'bor_1',
+        principal: 10000.0,
+        interestRate: 12.0,
+        termMonths: 12,
+        purpose: 'Business Expansion',
+        status: 'active',
+        disbursementDate: '2026-01-01',
+        processingFeeType: 'fixed',
+        processingFeeValue: 200.0,
+        serviceFeeType: 'percent',
+        serviceFeeValue: 1.0, // 1% = 100
+        schedule: schedule,
+        payments: [],
+        notes: '',
+      );
+
+      final statement = ReceiptUtils.generateDisclosureStatement(
+        businessName: 'Pinoy MicroLending',
+        borrower: borrower,
+        loan: loan,
+        currencyCode: 'PHP',
+      );
+
+      expect(statement, contains('DISCLOSURE STATEMENT ON LOAN/CREDIT TRANSACTION'));
+      expect(statement, contains('R.A. 3765 / SEC MC 3'));
+      expect(statement, contains('Maria Santos'));
+      expect(statement, contains('₱10,000.00'));
+      expect(statement, contains('Processing Fee:               ₱200.00'));
+      expect(statement, contains('Service Fee:                  ₱100.00'));
+      expect(statement, contains('TOTAL ITEMIZED FEES / CHARGES:     ₱300.00'));
+      expect(statement, contains('NET PROCEEDS DISBURSED:            ₱9,700.00'));
+      expect(statement, contains('Effective Interest Rate (EIR):'));
+      expect(statement, contains('Annual Percentage Rate (APR):'));
+    });
   });
 }

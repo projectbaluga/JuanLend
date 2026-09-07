@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/loan.dart';
+import '../models/schedule_installment.dart';
 import '../store/app_state.dart';
 import '../utils/loan_utils.dart';
 import '../widgets/app_badge.dart';
@@ -54,8 +55,18 @@ class _LoansScreenState extends State<LoansScreen> {
     final notesCtrl = TextEditingController();
     final penaltyValueCtrl = TextEditingController(text: state.defaultPenaltyValue.toString());
 
-    String deductionType = 'none'; // 'none', 'fixed', 'percent'
-    final deductionValueCtrl = TextEditingController(text: '0');
+    String processingFeeType = 'none';
+    final processingFeeCtrl = TextEditingController(text: '0');
+    String serviceFeeType = 'none';
+    final serviceFeeCtrl = TextEditingController(text: '0');
+    String disbursementFeeType = 'none';
+    final disbursementFeeCtrl = TextEditingController(text: '0');
+    String notarialFeeType = 'none';
+    final notarialFeeCtrl = TextEditingController(text: '0');
+    String insuranceFeeType = 'none';
+    final insuranceFeeCtrl = TextEditingController(text: '0');
+
+    bool enforceCoveredCaps = false;
     String? validationError;
 
     showModalBottomSheet(
@@ -67,10 +78,30 @@ class _LoansScreenState extends State<LoansScreen> {
             final p = double.tryParse(principalCtrl.text.trim()) ?? 0.0;
             final r = double.tryParse(rateCtrl.text.trim()) ?? 0.0;
             final t = int.tryParse(termCtrl.text.trim()) ?? 1;
-            final dVal = double.tryParse(deductionValueCtrl.text.trim()) ?? 0.0;
 
-            final deductionAmount = LoanUtils.calculateUpfrontDeduction(p, deductionType, dVal);
-            final netDisbursed = LoanUtils.calculateNetDisbursed(p, deductionType, dVal);
+            final procVal = double.tryParse(processingFeeCtrl.text.trim()) ?? 0.0;
+            final servVal = double.tryParse(serviceFeeCtrl.text.trim()) ?? 0.0;
+            final disbVal = double.tryParse(disbursementFeeCtrl.text.trim()) ?? 0.0;
+            final notaVal = double.tryParse(notarialFeeCtrl.text.trim()) ?? 0.0;
+            final insVal = double.tryParse(insuranceFeeCtrl.text.trim()) ?? 0.0;
+
+            final totalFees = LoanUtils.calculateTotalUpfrontFees(
+              principal: p,
+              processingFeeType: processingFeeType,
+              processingFeeValue: procVal,
+              serviceFeeType: serviceFeeType,
+              serviceFeeValue: servVal,
+              disbursementFeeType: disbursementFeeType,
+              disbursementFeeValue: disbVal,
+              notarialFeeType: notarialFeeType,
+              notarialFeeValue: notaVal,
+              creditLifeInsuranceFeeType: insuranceFeeType,
+              creditLifeInsuranceFeeValue: insVal,
+              termCount: t,
+              frequency: selectedFrequency,
+            );
+
+            final netDisbursed = LoanUtils.round2(p - totalFees);
 
             final schedPreview = (p > 0 && t > 0)
                 ? LoanUtils.generateSchedule(
@@ -81,7 +112,40 @@ class _LoansScreenState extends State<LoansScreen> {
                     repaymentFrequency: selectedFrequency,
                     interestMethod: selectedMethod,
                   )
-                : [];
+                : <ScheduleInstallment>[];
+
+            final monthlyNIR = LoanUtils.computeNominalRate(
+              interestRate: r,
+              interestMethod: selectedMethod,
+              repaymentFrequency: selectedFrequency,
+              termCount: t,
+              principal: p,
+            );
+
+            final monthlyEIR = LoanUtils.computeEffectiveInterestRate(
+              principal: p,
+              interestRate: r,
+              termCount: t,
+              repaymentFrequency: selectedFrequency,
+              interestMethod: selectedMethod,
+              totalFees: totalFees,
+              schedule: schedPreview,
+            );
+
+            final apr = LoanUtils.computeAPR(effectiveMonthlyRate: monthlyEIR);
+
+            final isCovered = enforceCoveredCaps || LoanUtils.isCoveredSmallLoan(
+              principal: p,
+              termCount: t,
+              repaymentFrequency: selectedFrequency,
+            );
+
+            final penVal = double.tryParse(penaltyValueCtrl.text.trim()) ?? 0.0;
+            final capBreached = isCovered && (
+              monthlyNIR > 6.001 ||
+              monthlyEIR > 15.001 ||
+              (selectedPenaltyType == 'percent_per_period' && penVal > 5.001)
+            );
 
             String termLabel = 'Term (months)';
             switch (selectedFrequency) {
@@ -200,23 +264,49 @@ class _LoansScreenState extends State<LoansScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          color: capBreached
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                          border: Border.all(
+                            color: capBreached ? Colors.redAccent : Colors.grey.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (deductionType != 'none') ...[
-                              Text('Upfront Fee Deduction: -${LoanUtils.formatCurrency(deductionAmount, state.currencyCode)}',
-                                  style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
-                              const SizedBox(height: 2),
-                              Text('Net Disbursed to Borrower: ${LoanUtils.formatCurrency(netDisbursed, state.currencyCode)}',
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                            if (capBreached) ...[
+                              Row(
+                                children: const [
+                                  Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
+                                  SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'REGULATORY CAP BREACH WARNING (SEC MC 3 / BSP Circular 1133)',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                                    ),
+                                  ),
+                                ],
+                              ),
                               const SizedBox(height: 6),
                             ],
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text('NIR: ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                Text('EIR: ${monthlyEIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                Text('APR: ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text('Itemized Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
+                                style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
+                            const SizedBox(height: 2),
+                            Text('Net Disbursed: ${LoanUtils.formatCurrency(netDisbursed, state.currencyCode)}',
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                            const SizedBox(height: 6),
                             if (schedPreview.isNotEmpty) ...[
-                              Text('Installments: ${schedPreview.length} period(s) @ ${LoanUtils.formatCurrency(schedPreview[0].amount, state.currencyCode)} / period',
+                              Text('Installments: ${schedPreview.length} period(s) @ ${LoanUtils.formatCurrency(schedPreview.first.amount, state.currencyCode)} / period',
                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                               const SizedBox(height: 4),
                               Row(
@@ -279,34 +369,166 @@ class _LoansScreenState extends State<LoansScreen> {
                             ],
                           ),
                           const SizedBox(height: 10),
+                          // Itemized Fees Breakdown Inputs
+                          const Text('Itemized Fee Breakdown', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                          const SizedBox(height: 6),
+
+                          // Processing Fee
                           Row(
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<String>(
-                                  initialValue: deductionType,
-                                  decoration: const InputDecoration(labelText: 'Upfront Deduction', border: OutlineInputBorder()),
+                                  initialValue: processingFeeType,
+                                  decoration: const InputDecoration(labelText: 'Processing Fee', border: OutlineInputBorder()),
                                   items: const [
                                     DropdownMenuItem(value: 'none', child: Text('None')),
                                     DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
-                                    DropdownMenuItem(value: 'percent', child: Text('Percentage (%)')),
+                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
                                   ],
-                                  onChanged: (val) {
-                                    if (val != null) {
-                                      setModalState(() {
-                                        deductionType = val;
-                                      });
-                                    }
-                                  },
+                                  onChanged: (val) => setModalState(() => processingFeeType = val ?? 'none'),
                                 ),
                               ),
-                              if (deductionType != 'none') ...[
+                              if (processingFeeType != 'none') ...[
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: TextField(
-                                    controller: deductionValueCtrl,
+                                    controller: processingFeeCtrl,
                                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                     decoration: InputDecoration(
-                                      labelText: deductionType == 'fixed' ? 'Deduction Amount' : 'Deduction Percentage (%)',
+                                      labelText: processingFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    onChanged: (_) => setModalState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Service Fee (Supports Daily % like Tala)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: serviceFeeType,
+                                  decoration: const InputDecoration(labelText: 'Service Fee', border: OutlineInputBorder()),
+                                  items: const [
+                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                    DropdownMenuItem(value: 'percent_per_day', child: Text('Percent / Day (%/day)')),
+                                  ],
+                                  onChanged: (val) => setModalState(() => serviceFeeType = val ?? 'none'),
+                                ),
+                              ),
+                              if (serviceFeeType != 'none') ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: serviceFeeCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: serviceFeeType == 'fixed' ? 'Amount' : (serviceFeeType == 'percent_per_day' ? 'Daily %' : 'Rate (%)'),
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    onChanged: (_) => setModalState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Disbursement Fee
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: disbursementFeeType,
+                                  decoration: const InputDecoration(labelText: 'Disbursement Fee', border: OutlineInputBorder()),
+                                  items: const [
+                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                  ],
+                                  onChanged: (val) => setModalState(() => disbursementFeeType = val ?? 'none'),
+                                ),
+                              ),
+                              if (disbursementFeeType != 'none') ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: disbursementFeeCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: disbursementFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    onChanged: (_) => setModalState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Notarial Fee
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: notarialFeeType,
+                                  decoration: const InputDecoration(labelText: 'Notarial Fee', border: OutlineInputBorder()),
+                                  items: const [
+                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                  ],
+                                  onChanged: (val) => setModalState(() => notarialFeeType = val ?? 'none'),
+                                ),
+                              ),
+                              if (notarialFeeType != 'none') ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: notarialFeeCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: notarialFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    onChanged: (_) => setModalState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Credit Life Insurance Fee
+                          Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  initialValue: insuranceFeeType,
+                                  decoration: const InputDecoration(labelText: 'Credit Life Insurance', border: OutlineInputBorder()),
+                                  items: const [
+                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                  ],
+                                  onChanged: (val) => setModalState(() => insuranceFeeType = val ?? 'none'),
+                                ),
+                              ),
+                              if (insuranceFeeType != 'none') ...[
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: insuranceFeeCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: InputDecoration(
+                                      labelText: insuranceFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
                                       border: const OutlineInputBorder(),
                                     ),
                                     onChanged: (_) => setModalState(() {}),
@@ -404,6 +626,10 @@ class _LoansScreenState extends State<LoansScreen> {
                               termCount: t,
                               repaymentFrequency: selectedFrequency,
                               penaltyValue: penVal,
+                              interestMethod: selectedMethod,
+                              totalFees: totalFees,
+                              penaltyType: selectedPenaltyType,
+                              enforceCoveredCaps: enforceCoveredCaps,
                             );
 
                             if (err != null) {
@@ -436,8 +662,18 @@ class _LoansScreenState extends State<LoansScreen> {
                               purpose: purpose,
                               status: 'pending',
                               disbursementDate: dateCtrl.text.trim(),
-                              upfrontDeductionType: deductionType,
-                              upfrontDeductionValue: dVal,
+                              upfrontDeductionType: 'none',
+                              upfrontDeductionValue: 0.0,
+                              processingFeeType: processingFeeType,
+                              processingFeeValue: procVal,
+                              serviceFeeType: serviceFeeType,
+                              serviceFeeValue: servVal,
+                              disbursementFeeType: disbursementFeeType,
+                              disbursementFeeValue: disbVal,
+                              notarialFeeType: notarialFeeType,
+                              notarialFeeValue: notaVal,
+                              creditLifeInsuranceFeeType: insuranceFeeType,
+                              creditLifeInsuranceFeeValue: insVal,
                               penaltyType: selectedPenaltyType,
                               penaltyValue: penVal,
                               creditAssessment: assessment,

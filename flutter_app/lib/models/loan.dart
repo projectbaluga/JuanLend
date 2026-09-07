@@ -16,6 +16,16 @@ class Loan {
   final String disbursementDate;
   final String upfrontDeductionType; // 'none', 'fixed', 'percent'
   final double upfrontDeductionValue;
+  final String processingFeeType; // 'none', 'fixed', 'percent', 'percent_per_day'
+  final double processingFeeValue;
+  final String serviceFeeType; // 'none', 'fixed', 'percent', 'percent_per_day'
+  final double serviceFeeValue;
+  final String disbursementFeeType; // 'none', 'fixed', 'percent', 'percent_per_day'
+  final double disbursementFeeValue;
+  final String notarialFeeType; // 'none', 'fixed', 'percent', 'percent_per_day'
+  final double notarialFeeValue;
+  final String creditLifeInsuranceFeeType; // 'none', 'fixed', 'percent', 'percent_per_day'
+  final double creditLifeInsuranceFeeValue;
   final String penaltyType; // 'none', 'fixed_per_period', 'percent_per_period', 'fixed_once'
   final double penaltyValue;
   final double accruedPenalty;
@@ -41,6 +51,16 @@ class Loan {
     required this.disbursementDate,
     this.upfrontDeductionType = 'none',
     this.upfrontDeductionValue = 0.0,
+    this.processingFeeType = 'none',
+    this.processingFeeValue = 0.0,
+    this.serviceFeeType = 'none',
+    this.serviceFeeValue = 0.0,
+    this.disbursementFeeType = 'none',
+    this.disbursementFeeValue = 0.0,
+    this.notarialFeeType = 'none',
+    this.notarialFeeValue = 0.0,
+    this.creditLifeInsuranceFeeType = 'none',
+    this.creditLifeInsuranceFeeValue = 0.0,
     this.penaltyType = 'none',
     this.penaltyValue = 0.0,
     this.accruedPenalty = 0.0,
@@ -71,6 +91,16 @@ class Loan {
       disbursementDate: map['disbursement_date']?.toString() ?? map['disbursementDate']?.toString() ?? '',
       upfrontDeductionType: map['upfront_deduction_type']?.toString() ?? map['upfrontDeductionType']?.toString() ?? 'none',
       upfrontDeductionValue: (map['upfront_deduction_value'] as num?)?.toDouble() ?? (map['upfrontDeductionValue'] as num?)?.toDouble() ?? 0.0,
+      processingFeeType: map['processing_fee_type']?.toString() ?? map['processingFeeType']?.toString() ?? 'none',
+      processingFeeValue: (map['processing_fee_value'] as num?)?.toDouble() ?? (map['processingFeeValue'] as num?)?.toDouble() ?? 0.0,
+      serviceFeeType: map['service_fee_type']?.toString() ?? map['serviceFeeType']?.toString() ?? 'none',
+      serviceFeeValue: (map['service_fee_value'] as num?)?.toDouble() ?? (map['serviceFeeValue'] as num?)?.toDouble() ?? 0.0,
+      disbursementFeeType: map['disbursement_fee_type']?.toString() ?? map['disbursementFeeType']?.toString() ?? 'none',
+      disbursementFeeValue: (map['disbursement_fee_value'] as num?)?.toDouble() ?? (map['disbursementFeeValue'] as num?)?.toDouble() ?? 0.0,
+      notarialFeeType: map['notarial_fee_type']?.toString() ?? map['notarialFeeType']?.toString() ?? 'none',
+      notarialFeeValue: (map['notarial_fee_value'] as num?)?.toDouble() ?? (map['notarialFeeValue'] as num?)?.toDouble() ?? 0.0,
+      creditLifeInsuranceFeeType: map['credit_life_insurance_fee_type']?.toString() ?? map['creditLifeInsuranceFeeType']?.toString() ?? 'none',
+      creditLifeInsuranceFeeValue: (map['credit_life_insurance_fee_value'] as num?)?.toDouble() ?? (map['creditLifeInsuranceFeeValue'] as num?)?.toDouble() ?? 0.0,
       penaltyType: map['penalty_type']?.toString() ?? map['penaltyType']?.toString() ?? 'none',
       penaltyValue: (map['penalty_value'] as num?)?.toDouble() ?? (map['penaltyValue'] as num?)?.toDouble() ?? 0.0,
       accruedPenalty: (map['accrued_penalty'] as num?)?.toDouble() ?? (map['accruedPenalty'] as num?)?.toDouble() ?? 0.0,
@@ -105,6 +135,16 @@ class Loan {
       'disbursement_date': disbursementDate,
       'upfront_deduction_type': upfrontDeductionType,
       'upfront_deduction_value': upfrontDeductionValue,
+      'processing_fee_type': processingFeeType,
+      'processing_fee_value': processingFeeValue,
+      'service_fee_type': serviceFeeType,
+      'service_fee_value': serviceFeeValue,
+      'disbursement_fee_type': disbursementFeeType,
+      'disbursement_fee_value': disbursementFeeValue,
+      'notarial_fee_type': notarialFeeType,
+      'notarial_fee_value': notarialFeeValue,
+      'credit_life_insurance_fee_type': creditLifeInsuranceFeeType,
+      'credit_life_insurance_fee_value': creditLifeInsuranceFeeValue,
       'penalty_type': penaltyType,
       'penalty_value': penaltyValue,
       'accrued_penalty': accruedPenalty,
@@ -132,6 +172,16 @@ class Loan {
     String? disbursementDate,
     String? upfrontDeductionType,
     double? upfrontDeductionValue,
+    String? processingFeeType,
+    double? processingFeeValue,
+    String? serviceFeeType,
+    double? serviceFeeValue,
+    String? disbursementFeeType,
+    double? disbursementFeeValue,
+    String? notarialFeeType,
+    double? notarialFeeValue,
+    String? creditLifeInsuranceFeeType,
+    double? creditLifeInsuranceFeeValue,
     String? penaltyType,
     double? penaltyValue,
     double? accruedPenalty,
@@ -157,6 +207,16 @@ class Loan {
       disbursementDate: disbursementDate ?? this.disbursementDate,
       upfrontDeductionType: upfrontDeductionType ?? this.upfrontDeductionType,
       upfrontDeductionValue: upfrontDeductionValue ?? this.upfrontDeductionValue,
+      processingFeeType: processingFeeType ?? this.processingFeeType,
+      processingFeeValue: processingFeeValue ?? this.processingFeeValue,
+      serviceFeeType: serviceFeeType ?? this.serviceFeeType,
+      serviceFeeValue: serviceFeeValue ?? this.serviceFeeValue,
+      disbursementFeeType: disbursementFeeType ?? this.disbursementFeeType,
+      disbursementFeeValue: disbursementFeeValue ?? this.disbursementFeeValue,
+      notarialFeeType: notarialFeeType ?? this.notarialFeeType,
+      notarialFeeValue: notarialFeeValue ?? this.notarialFeeValue,
+      creditLifeInsuranceFeeType: creditLifeInsuranceFeeType ?? this.creditLifeInsuranceFeeType,
+      creditLifeInsuranceFeeValue: creditLifeInsuranceFeeValue ?? this.creditLifeInsuranceFeeValue,
       penaltyType: penaltyType ?? this.penaltyType,
       penaltyValue: penaltyValue ?? this.penaltyValue,
       accruedPenalty: accruedPenalty ?? this.accruedPenalty,
