@@ -1,19 +1,12 @@
-# Unified GitHub Actions Workflow for License & Keypair Management
-name: License & Keypair Tools
+# GitHub Actions Workflow for Generating Machine License Keys
+name: Generate License Key
 
 on:
   workflow_dispatch:
     inputs:
-      mode:
-        description: 'Tool mode to execute: keypair (generate new Ed25519 keypair) or license (generate machine-bound license key)'
-        required: true
-        type: choice
-        options:
-          - keypair
-          - license
       machine_id:
-        description: 'Machine ID / Device Fingerprint from app Settings -> Unlock section (Required for license mode)'
-        required: false
+        description: 'Machine ID / Device Fingerprint from app Settings -> Unlock section'
+        required: true
         type: string
 
 defaults:
@@ -21,8 +14,8 @@ defaults:
     working-directory: flutter_app
 
 jobs:
-  license-tools:
-    name: Run License Tool (${{ inputs.mode }})
+  generate-license:
+    name: Generate Machine License Key
     runs-on: ubuntu-latest
 
     steps:
@@ -38,13 +31,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate Ed25519 Key Pair
-        if: ${{ inputs.mode == 'keypair' }}
-        run: |
-          dart run tool/generate_keypair.dart | tee tool_output.txt
-
       - name: Generate Machine License Key
-        if: ${{ inputs.mode == 'license' }}
         env:
           LICENSE_PRIVATE_KEY: ${{ secrets.LICENSE_PRIVATE_KEY }}
           MACHINE_ID_INPUT: ${{ inputs.machine_id }}
@@ -54,13 +41,13 @@ jobs:
             exit 1
           fi
           if [ -z "$MACHINE_ID_INPUT" ]; then
-            echo "Error: machine_id input parameter is required when running in license mode."
+            echo "Error: machine_id input parameter is required."
             exit 1
           fi
           dart run tool/generate_license.dart --machine-id "$MACHINE_ID_INPUT" --private-key "$LICENSE_PRIVATE_KEY" | tee tool_output.txt
 
-      - name: Upload Tool Output Artifact
+      - name: Upload License Key Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: license-tool-output-${{ inputs.mode }}
+          name: license-key-output
           path: flutter_app/tool_output.txt

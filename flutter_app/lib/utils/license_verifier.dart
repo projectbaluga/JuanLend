@@ -3,7 +3,7 @@ import 'package:cryptography/cryptography.dart';
 
 class LicenseVerifier {
   // Master embedded Ed25519 public key hex
-  static const String masterPublicKeyHex = 'e50231bd4e84c74c8a39493023a1743937c522846689515eaa5c99d9c5d88d86';
+  static const String masterPublicKeyHex = '9de600b6222feba1b719b762236aab6d59c1c42887b2fba9462014fffe985766';
 
   static Future<bool> verifyLicenseKey(
     String licenseKey,
