@@ -544,5 +544,51 @@ void main() {
       final stats = LoanUtils.getLoanStats(updatedLoan);
       expect(stats.creditBalance, 50.0);
     });
+
+    test('rolloverLoan and topUpLoan work correctly with permissions and limits', () async {
+      await appState.createUser('officer_rt', 'officer123', 'officer');
+      await appState.login('officer_rt', 'officer123');
+
+      final borrower = Borrower(
+        id: 'bor_topup',
+        fullName: 'Topup Borrower',
+        email: '',
+        phone: '',
+        address: '',
+        idNumber: '',
+        employment: '',
+        monthlyIncome: 10000.0, // Credit limit = 50,000
+        creditScore: 80,
+        riskRating: 'low',
+        notes: '',
+      );
+      await appState.addBorrower(borrower);
+
+      final loan = Loan(
+        id: 'active_loan_topup',
+        borrowerId: 'bor_topup',
+        principal: 5000.0,
+        interestRate: 12.0,
+        termMonths: 6,
+        purpose: 'TopUp Test',
+        status: 'active',
+        disbursementDate: '2026-01-01',
+        schedule: LoanUtils.generateSchedule(5000.0, 12.0, 6, '2026-01-01'),
+        payments: [],
+        notes: '',
+      );
+      await appState.addLoan(loan);
+
+      // Top up 2000 principal
+      await appState.topUpLoan(loan.id, additionalPrincipal: 2000.0);
+      final toppedUpLoan = appState.loans.firstWhere((l) => l.id == loan.id);
+      expect(toppedUpLoan.principal, 7000.0);
+
+      // Rollover by extending 2 periods with fixed fee
+      await appState.rolloverLoan(loan.id, extensionPeriods: 2, extensionFeeValue: 150.0, extensionFeeType: 'fixed');
+      final rolledOverLoan = appState.loans.firstWhere((l) => l.id == loan.id);
+      expect(rolledOverLoan.termCount, 8);
+      expect(rolledOverLoan.serviceFeeValue, 150.0);
+    });
   });
 }
