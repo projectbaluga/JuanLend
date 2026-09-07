@@ -175,562 +175,634 @@ class _LoansScreenState extends State<LoansScreen> {
                 right: 16,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
               ),
-              child: SingleChildScrollView(
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 650),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Issue New Loan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-
-                    // Section 1: Borrower & Amount
-                    const Text('1. Borrower & Amount', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    const SizedBox(height: 6),
-                    DropdownButtonFormField<String>(
-                      initialValue: selectedBorrowerId,
-                      decoration: const InputDecoration(labelText: 'Borrower *', border: OutlineInputBorder()),
-                      items: borrowers.map((b) {
-                        return DropdownMenuItem(value: b.id, child: Text(b.fullName));
-                      }).toList(),
-                      onChanged: (val) {
-                        if (val != null) setModalState(() => selectedBorrowerId = val);
-                      },
-                    ),
-                    const SizedBox(height: 10),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: principalCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: InputDecoration(
-                              labelText: 'Principal (${LoanUtils.currencySymbol(state.currencyCode)}) *',
-                              hintText: 'e.g. 3000',
-                              border: const OutlineInputBorder(),
-                            ),
-                            onChanged: (_) => setModalState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: rateCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: InputDecoration(
-                              labelText: 'Rate (%) *',
-                              helperText: (selectedMethod == 'reducing' || selectedMethod == 'interest_only')
-                                  ? '% per annum (taunan)'
-                                  : '% total sa buong term',
-                              border: const OutlineInputBorder(),
-                            ),
-                            onChanged: (_) => setModalState(() {}),
-                          ),
+                        const Text('Issue New Loan', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
                     ),
+                    const Divider(),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isWide = constraints.maxWidth >= 550;
 
-                    const SizedBox(height: 14),
-
-                    // Section 2: Loan Terms & Purpose
-                    const Text('2. Loan Terms & Purpose', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: termCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(labelText: '$termLabel *', border: const OutlineInputBorder()),
-                            onChanged: (_) => setModalState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            controller: purposeCtrl,
-                            decoration: const InputDecoration(
-                              labelText: 'Purpose *',
-                              hintText: 'e.g. Working Capital',
-                              border: OutlineInputBorder(),
-                            ),
-                            onChanged: (_) => setModalState(() {}),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    if (validationError != null) ...[
-                      Text(validationError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
-                      const SizedBox(height: 8),
-                    ],
-
-                    // Prominent Live Preview Box
-                    if (p > 0) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: capBreached
-                              ? Colors.red.withValues(alpha: 0.1)
-                              : Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: capBreached ? Colors.redAccent : Colors.grey.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (capBreached) ...[
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: const [
-                                  Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
-                                  SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      'BABALA: Lumampas sa legal na limit ng SEC/BSP para sa maliliit na loan (SEC MC 3 / BSP Circular 1133). Ibaba ang interest rate o fees para maituloy nang legal.',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent),
-                                    ),
-                                  ),
+                            Widget buildFieldPair(Widget left, Widget right) {
+                              if (isWide) {
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(child: left),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: right),
+                                  ],
+                                );
+                              }
+                              return Column(
+                                children: [
+                                  left,
+                                  const SizedBox(height: 10),
+                                  right,
                                 ],
-                              ),
-                              const SizedBox(height: 8),
-                            ],
+                              );
+                            }
 
-                            // Highlight top 3 figures with large readable fonts
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 8,
-                              alignment: WrapAlignment.spaceBetween,
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Matatanggap ng Borrower (Net Disbursed)', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                    Text(LoanUtils.formatCurrency(netDisbursed, state.currencyCode),
-                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text('Kabuuang Babayaran (Total Repayable)', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                    Text(LoanUtils.formatCurrency(totalScheduled, state.currencyCode),
-                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                                  ],
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
+                                // Step 1: Borrower & Amount
+                                Card(
+                                  elevation: 0,
+                                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        const Text('Totoong Gastos / EIR ', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                        Tooltip(
-                                          message: 'EIR (Effective Interest Rate) — Ang totoong buong gastos ng loan kada buwan, kasama na ang lahat ng fees at interest.',
-                                          child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                        const Text('Step 1: Borrower & Amount', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                        const SizedBox(height: 10),
+                                        DropdownButtonFormField<String>(
+                                          initialValue: selectedBorrowerId,
+                                          decoration: const InputDecoration(labelText: 'Borrower *', border: OutlineInputBorder()),
+                                          items: borrowers.map((b) {
+                                            return DropdownMenuItem(value: b.id, child: Text(b.fullName));
+                                          }).toList(),
+                                          onChanged: (val) {
+                                            if (val != null) setModalState(() => selectedBorrowerId = val);
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+                                        buildFieldPair(
+                                          TextField(
+                                            controller: principalCtrl,
+                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                            decoration: InputDecoration(
+                                              labelText: 'Principal Amount (${LoanUtils.currencySymbol(state.currencyCode)}) *',
+                                              hintText: 'e.g. 5000',
+                                              border: const OutlineInputBorder(),
+                                            ),
+                                            onChanged: (_) => setModalState(() {}),
+                                          ),
+                                          TextField(
+                                            controller: rateCtrl,
+                                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                            decoration: InputDecoration(
+                                              labelText: 'Interest Rate (%) *',
+                                              helperText: (selectedMethod == 'reducing' || selectedMethod == 'interest_only')
+                                                  ? '% per year (per annum)'
+                                                  : '% total for the whole term',
+                                              border: const OutlineInputBorder(),
+                                            ),
+                                            onChanged: (_) => setModalState(() {}),
+                                          ),
                                         ),
                                       ],
                                     ),
-                                    Text('${monthlyEIR.toStringAsFixed(1)}% / buwan',
-                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
-                                  ],
+                                  ),
                                 ),
-                              ],
-                            ),
 
-                            const SizedBox(height: 8),
-                            const Divider(height: 8),
-                            const SizedBox(height: 4),
-
-                            // Secondary details with Plain Language and Tooltips
-                            Wrap(
-                              spacing: 12,
-                              runSpacing: 4,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('Basic Interest / NIR: ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                    const SizedBox(width: 2),
-                                    Tooltip(
-                                      message: 'NIR (Nominal Interest Rate) — Ang batayang interest rate ng loan, hindi pa kasama ang karagdagang fees.',
-                                      child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text('Taunang Rate / APR: ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                    const SizedBox(width: 2),
-                                    Tooltip(
-                                      message: 'APR (Annual Percentage Rate) — Ang taunang katumbas ng lahat ng gastos sa loan kung ie-extend ng isang taon.',
-                                      child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                                Text('Mga Bayarin / Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
-                                    style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
-                                Text('Tubo / Interest: ${LoanUtils.formatCurrency(totalInterest, state.currencyCode)}',
-                                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                              ],
-                            ),
-
-                            if (schedPreview.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Text('Hulog: ${schedPreview.length} period(s) @ ${LoanUtils.formatCurrency(schedPreview.first.amount, state.currencyCode)} / period',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-
-                    // Advanced Options Collapsible ExpansionTile with live fee summary
-                    Theme(
-                      data: Theme.of(ctx).copyWith(dividerColor: Colors.transparent),
-                      child: ExpansionTile(
-                        title: const Text('Advanced options & Itemized Fees', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        subtitle: Text(
-                          totalFees > 0
-                              ? 'Mga bayarin: ${LoanUtils.formatCurrency(totalFees, state.currencyCode)} kabuuan'
-                              : 'Mga bayarin: Wala pa (₱0)',
-                          style: TextStyle(fontSize: 11, color: totalFees > 0 ? Colors.redAccent : Colors.grey),
-                        ),
-                        tilePadding: EdgeInsets.zero,
-                        childrenPadding: const EdgeInsets.only(top: 4, bottom: 8),
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: selectedFrequency,
-                                  decoration: const InputDecoration(labelText: 'Frequency', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'daily', child: Text('Daily')),
-                                    DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
-                                    DropdownMenuItem(value: 'biweekly', child: Text('Bi-weekly')),
-                                    DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
-                                  ],
-                                  onChanged: (val) {
-                                    if (val != null) setModalState(() => selectedFrequency = val);
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: DropdownButtonFormField<String>(
-                                        initialValue: selectedMethod,
-                                        isExpanded: true,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Interest Method',
-                                          border: OutlineInputBorder(),
+                                // Step 2: Loan Terms
+                                Card(
+                                  elevation: 0,
+                                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Step 2: Loan Terms', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                        const SizedBox(height: 10),
+                                        buildFieldPair(
+                                          DropdownButtonFormField<String>(
+                                            initialValue: selectedFrequency,
+                                            decoration: const InputDecoration(labelText: 'Repayment Frequency', border: OutlineInputBorder()),
+                                            items: const [
+                                              DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                                              DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                                              DropdownMenuItem(value: 'biweekly', child: Text('Bi-weekly')),
+                                              DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                                            ],
+                                            onChanged: (val) {
+                                              if (val != null) setModalState(() => selectedFrequency = val);
+                                            },
+                                          ),
+                                          TextField(
+                                            controller: termCtrl,
+                                            keyboardType: TextInputType.number,
+                                            decoration: InputDecoration(labelText: '$termLabel *', border: const OutlineInputBorder()),
+                                            onChanged: (_) => setModalState(() {}),
+                                          ),
                                         ),
-                                        items: const [
-                                          DropdownMenuItem(
-                                            value: 'reducing',
-                                            child: Text('Reducing Balance — bumababa ang interest habang nababayaran (Pag-IBIG/SSS style)', overflow: TextOverflow.ellipsis),
-                                          ),
-                                          DropdownMenuItem(
-                                            value: 'flat',
-                                            child: Text('Flat / Add-on — interest sa buong principal buong term ("5-6" style, mas mahal)', overflow: TextOverflow.ellipsis),
-                                          ),
-                                          DropdownMenuItem(
-                                            value: 'interest_only',
-                                            child: Text('Interest-Only — interest lang muna, principal sa dulo', overflow: TextOverflow.ellipsis),
-                                          ),
-                                          DropdownMenuItem(
-                                            value: 'one_time',
-                                            child: Text('One-Time Payment — isang bayaran sa dulo', overflow: TextOverflow.ellipsis),
-                                          ),
-                                        ],
-                                        onChanged: (val) {
-                                          if (val != null) setModalState(() => selectedMethod = val);
-                                        },
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.info_outline, size: 20, color: Colors.grey),
-                                      tooltip: 'Far mas mahal ang Flat/Add-on ("5-6") kaysa Reducing Balance dahil ang interest ng Flat ay kinakalkula mula sa orihinal na principal sa buong haba ng term kahit nabawasan na ang utang.',
-                                      onPressed: () {
-                                        showDialog(
-                                          context: context,
-                                          builder: (dialogCtx) => AlertDialog(
-                                            title: const Text('Paraan ng Pagkalkula ng Interest'),
-                                            content: const Text(
-                                              '• Reducing Balance: Bumababa ang binabayarang interest buwan-buwan dahil sa natitirang utang na lang ito kinakalkula (halimbawa: bank, SSS, Pag-IBIG loans).\n\n'
-                                              '• Flat / Add-on ("5-6"): Ang interest ay kinakalkula batay sa buong orihinal na principal sa buong haba ng term. Mas mahal ito sa katunayan dahil hindi bumababa ang batayan ng interest kahit nagbabayad na ang borrower.',
+                                        const SizedBox(height: 10),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: DropdownButtonFormField<String>(
+                                                initialValue: selectedMethod,
+                                                isExpanded: true,
+                                                decoration: const InputDecoration(
+                                                  labelText: 'Interest Method',
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                                items: const [
+                                                  DropdownMenuItem(
+                                                    value: 'reducing',
+                                                    child: Text('Reducing Balance — interest shrinks as you pay down the loan (borrower-friendly)', overflow: TextOverflow.ellipsis),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value: 'flat',
+                                                    child: Text('Flat / Add-on — interest charged on the full amount for the whole term (more expensive)', overflow: TextOverflow.ellipsis),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value: 'interest_only',
+                                                    child: Text('Interest-Only — pay interest first, full principal at the end', overflow: TextOverflow.ellipsis),
+                                                  ),
+                                                  DropdownMenuItem(
+                                                    value: 'one_time',
+                                                    child: Text('One-Time Payment — single lump-sum repayment at the end', overflow: TextOverflow.ellipsis),
+                                                  ),
+                                                ],
+                                                onChanged: (val) {
+                                                  if (val != null) setModalState(() => selectedMethod = val);
+                                                },
+                                              ),
                                             ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(dialogCtx),
-                                                child: const Text('Naintindihan'),
+                                            IconButton(
+                                              icon: const Icon(Icons.info_outline, size: 20, color: Colors.grey),
+                                              tooltip: 'Flat / Add-on interest is computed on the full initial principal for the entire loan term regardless of balance repayments. Reducing balance interest decreases with each repayment.',
+                                              onPressed: () {
+                                                showDialog(
+                                                  context: context,
+                                                  builder: (dialogCtx) => AlertDialog(
+                                                    title: const Text('Interest Calculation Methods'),
+                                                    content: const Text(
+                                                      '• Reducing Balance: Interest is recalculated on the remaining unpaid balance each period (Standard bank, SSS, Pag-IBIG method).\n\n'
+                                                      '• Flat / Add-on: Interest is calculated on the full initial principal across the whole term. This makes the effective borrowing cost significantly higher.',
+                                                    ),
+                                                    actions: [
+                                                      TextButton(
+                                                        onPressed: () => Navigator.pop(dialogCtx),
+                                                        child: const Text('Got it'),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        buildFieldPair(
+                                          TextField(
+                                            controller: purposeCtrl,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Loan Purpose *',
+                                              hintText: 'e.g. Working Capital',
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            onChanged: (_) => setModalState(() {}),
+                                          ),
+                                          TextField(
+                                            controller: dateCtrl,
+                                            readOnly: true,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Disbursement Date',
+                                              suffixIcon: Icon(Icons.calendar_today, size: 18),
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            onTap: () async {
+                                              DateTime initial;
+                                              try {
+                                                initial = DateTime.parse(dateCtrl.text.trim());
+                                              } catch (_) {
+                                                initial = DateTime.now();
+                                              }
+                                              final picked = await showDatePicker(
+                                                context: context,
+                                                initialDate: initial,
+                                                firstDate: DateTime(2000),
+                                                lastDate: DateTime(2100),
+                                              );
+                                              if (picked != null) {
+                                                setModalState(() {
+                                                  dateCtrl.text = picked.toIso8601String().split('T')[0];
+                                                });
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                // Step 3: Fees & Penalties (optional)
+                                Theme(
+                                  data: Theme.of(ctx).copyWith(dividerColor: Colors.transparent),
+                                  child: Card(
+                                    elevation: 0,
+                                    color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    child: ExpansionTile(
+                                      title: const Text('Step 3: Fees & Penalties (optional)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                      subtitle: Text(
+                                        totalFees > 0
+                                            ? 'Total fees: ${LoanUtils.formatCurrency(totalFees, state.currencyCode)}'
+                                            : 'No extra fees',
+                                        style: TextStyle(fontSize: 11, color: totalFees > 0 ? Colors.redAccent : Colors.grey),
+                                      ),
+                                      tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                                      childrenPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      children: [
+                                        buildFieldPair(
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: DropdownButtonFormField<String>(
+                                                  initialValue: processingFeeType,
+                                                  decoration: const InputDecoration(labelText: 'Processing Fee', border: OutlineInputBorder()),
+                                                  items: const [
+                                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                                  ],
+                                                  onChanged: (val) => setModalState(() => processingFeeType = val ?? 'none'),
+                                                ),
+                                              ),
+                                              if (processingFeeType != 'none') ...[
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: TextField(
+                                                    controller: processingFeeCtrl,
+                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                    decoration: InputDecoration(
+                                                      labelText: processingFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
+                                                      border: const OutlineInputBorder(),
+                                                    ),
+                                                    onChanged: (_) => setModalState(() {}),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: DropdownButtonFormField<String>(
+                                                  initialValue: serviceFeeType,
+                                                  decoration: const InputDecoration(labelText: 'Service Fee', border: OutlineInputBorder()),
+                                                  items: const [
+                                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                                    DropdownMenuItem(value: 'percent_per_day', child: Text('Percent / Day (%/day)')),
+                                                  ],
+                                                  onChanged: (val) => setModalState(() => serviceFeeType = val ?? 'none'),
+                                                ),
+                                              ),
+                                              if (serviceFeeType != 'none') ...[
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: TextField(
+                                                    controller: serviceFeeCtrl,
+                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                    decoration: InputDecoration(
+                                                      labelText: serviceFeeType == 'fixed' ? 'Amount' : (serviceFeeType == 'percent_per_day' ? 'Daily %' : 'Rate (%)'),
+                                                      border: const OutlineInputBorder(),
+                                                    ),
+                                                    onChanged: (_) => setModalState(() {}),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        buildFieldPair(
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: DropdownButtonFormField<String>(
+                                                  initialValue: disbursementFeeType,
+                                                  decoration: const InputDecoration(labelText: 'Disbursement Fee', border: OutlineInputBorder()),
+                                                  items: const [
+                                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                                  ],
+                                                  onChanged: (val) => setModalState(() => disbursementFeeType = val ?? 'none'),
+                                                ),
+                                              ),
+                                              if (disbursementFeeType != 'none') ...[
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: TextField(
+                                                    controller: disbursementFeeCtrl,
+                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                    decoration: InputDecoration(
+                                                      labelText: disbursementFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
+                                                      border: const OutlineInputBorder(),
+                                                    ),
+                                                    onChanged: (_) => setModalState(() {}),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: DropdownButtonFormField<String>(
+                                                  initialValue: notarialFeeType,
+                                                  decoration: const InputDecoration(labelText: 'Notarial Fee', border: OutlineInputBorder()),
+                                                  items: const [
+                                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                                  ],
+                                                  onChanged: (val) => setModalState(() => notarialFeeType = val ?? 'none'),
+                                                ),
+                                              ),
+                                              if (notarialFeeType != 'none') ...[
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: TextField(
+                                                    controller: notarialFeeCtrl,
+                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                    decoration: InputDecoration(
+                                                      labelText: notarialFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
+                                                      border: const OutlineInputBorder(),
+                                                    ),
+                                                    onChanged: (_) => setModalState(() {}),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        buildFieldPair(
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: DropdownButtonFormField<String>(
+                                                  initialValue: insuranceFeeType,
+                                                  decoration: const InputDecoration(labelText: 'Credit Life Insurance', border: OutlineInputBorder()),
+                                                  items: const [
+                                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
+                                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
+                                                  ],
+                                                  onChanged: (val) => setModalState(() => insuranceFeeType = val ?? 'none'),
+                                                ),
+                                              ),
+                                              if (insuranceFeeType != 'none') ...[
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: TextField(
+                                                    controller: insuranceFeeCtrl,
+                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                    decoration: InputDecoration(
+                                                      labelText: insuranceFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
+                                                      border: const OutlineInputBorder(),
+                                                    ),
+                                                    onChanged: (_) => setModalState(() {}),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: DropdownButtonFormField<String>(
+                                                  initialValue: selectedPenaltyType,
+                                                  decoration: const InputDecoration(labelText: 'Late Penalty Type', border: OutlineInputBorder()),
+                                                  items: const [
+                                                    DropdownMenuItem(value: 'none', child: Text('None')),
+                                                    DropdownMenuItem(value: 'fixed_per_period', child: Text('Fixed per overdue period')),
+                                                    DropdownMenuItem(value: 'percent_per_period', child: Text('Percent (%) per overdue period')),
+                                                    DropdownMenuItem(value: 'fixed_once', child: Text('Fixed once when overdue')),
+                                                  ],
+                                                  onChanged: (val) {
+                                                    if (val != null) setModalState(() => selectedPenaltyType = val);
+                                                  },
+                                                ),
+                                              ),
+                                              if (selectedPenaltyType != 'none') ...[
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: TextField(
+                                                    controller: penaltyValueCtrl,
+                                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                                    decoration: InputDecoration(
+                                                      labelText: selectedPenaltyType == 'percent_per_period' ? 'Penalty Rate (%)' : 'Penalty Amount',
+                                                      border: const OutlineInputBorder(),
+                                                    ),
+                                                    onChanged: (_) => setModalState(() {}),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        TextField(
+                                          controller: notesCtrl,
+                                          decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder()),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                // Step 4: Review Live Preview Box
+                                Card(
+                                  elevation: 0,
+                                  color: capBreached
+                                      ? Colors.red.withValues(alpha: 0.1)
+                                      : Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    side: BorderSide(
+                                      color: capBreached ? Colors.redAccent : Colors.grey.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Step 4: Review Loan Terms', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                        const SizedBox(height: 10),
+
+                                        if (capBreached) ...[
+                                          Row(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: const [
+                                              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
+                                              SizedBox(width: 6),
+                                              Expanded(
+                                                child: Text(
+                                                  'This loan exceeds the legal SEC/BSP limit for small loans. Lower the interest rate or fees to proceed legally.',
+                                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent),
+                                                ),
                                               ),
                                             ],
                                           ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          // Itemized Fees Breakdown Inputs
-                          const Text('Itemized Fee Breakdown', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                          const SizedBox(height: 6),
+                                          const SizedBox(height: 8),
+                                        ],
 
-                          // Processing Fee
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: processingFeeType,
-                                  decoration: const InputDecoration(labelText: 'Processing Fee', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'none', child: Text('None')),
-                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
-                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
-                                  ],
-                                  onChanged: (val) => setModalState(() => processingFeeType = val ?? 'none'),
-                                ),
-                              ),
-                              if (processingFeeType != 'none') ...[
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: processingFeeCtrl,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: InputDecoration(
-                                      labelText: processingFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
-                                      border: const OutlineInputBorder(),
-                                    ),
-                                    onChanged: (_) => setModalState(() {}),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 8),
+                                        if (p > 0) ...[
+                                          Wrap(
+                                            spacing: 16,
+                                            runSpacing: 10,
+                                            alignment: WrapAlignment.spaceBetween,
+                                            children: [
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: const [
+                                                      Text('Borrower Receives', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                                      SizedBox(width: 2),
+                                                      Tooltip(
+                                                        message: 'Net disbursed amount received by borrower after deducting upfront fees.',
+                                                        child: Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Text(LoanUtils.formatCurrency(netDisbursed, state.currencyCode),
+                                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                                                ],
+                                              ),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: const [
+                                                      Text('Total to Repay', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                                      SizedBox(width: 2),
+                                                      Tooltip(
+                                                        message: 'Total scheduled repayment sum across all installments.',
+                                                        child: Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Text(LoanUtils.formatCurrency(totalScheduled, state.currencyCode),
+                                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                                ],
+                                              ),
+                                              Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: const [
+                                                      Text('True Cost per Month (EIR)', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                                      SizedBox(width: 2),
+                                                      Tooltip(
+                                                        message: 'EIR (Effective Interest Rate) — The real monthly cost including all fees and interest.',
+                                                        child: Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Text('${monthlyEIR.toStringAsFixed(1)}% / mo',
+                                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
 
-                          // Service Fee (Supports Daily % like Tala)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: serviceFeeType,
-                                  decoration: const InputDecoration(labelText: 'Service Fee', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'none', child: Text('None')),
-                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
-                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
-                                    DropdownMenuItem(value: 'percent_per_day', child: Text('Percent / Day (%/day)')),
-                                  ],
-                                  onChanged: (val) => setModalState(() => serviceFeeType = val ?? 'none'),
-                                ),
-                              ),
-                              if (serviceFeeType != 'none') ...[
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: serviceFeeCtrl,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: InputDecoration(
-                                      labelText: serviceFeeType == 'fixed' ? 'Amount' : (serviceFeeType == 'percent_per_day' ? 'Daily %' : 'Rate (%)'),
-                                      border: const OutlineInputBorder(),
-                                    ),
-                                    onChanged: (_) => setModalState(() {}),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 8),
+                                          const SizedBox(height: 8),
+                                          const Divider(height: 8),
+                                          const SizedBox(height: 4),
 
-                          // Disbursement Fee
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: disbursementFeeType,
-                                  decoration: const InputDecoration(labelText: 'Disbursement Fee', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'none', child: Text('None')),
-                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
-                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
-                                  ],
-                                  onChanged: (val) => setModalState(() => disbursementFeeType = val ?? 'none'),
-                                ),
-                              ),
-                              if (disbursementFeeType != 'none') ...[
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: disbursementFeeCtrl,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: InputDecoration(
-                                      labelText: disbursementFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
-                                      border: const OutlineInputBorder(),
-                                    ),
-                                    onChanged: (_) => setModalState(() {}),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 8),
+                                          Wrap(
+                                            spacing: 14,
+                                            runSpacing: 4,
+                                            children: [
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text('Basic Rate (NIR): ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                  const SizedBox(width: 2),
+                                                  const Tooltip(
+                                                    message: 'NIR (Nominal Interest Rate) — Basic interest rate before upfront fees.',
+                                                    child: Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                                  ),
+                                                ],
+                                              ),
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text('Yearly Rate (APR): ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                                  const SizedBox(width: 2),
+                                                  const Tooltip(
+                                                    message: 'APR (Annual Percentage Rate) — Yearly equivalent of all borrowing costs.',
+                                                    child: Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                                  ),
+                                                ],
+                                              ),
+                                              Text('Total Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
+                                                  style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
+                                              Text('Total Interest: ${LoanUtils.formatCurrency(totalInterest, state.currencyCode)}',
+                                                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                            ],
+                                          ),
 
-                          // Notarial Fee
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: notarialFeeType,
-                                  decoration: const InputDecoration(labelText: 'Notarial Fee', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'none', child: Text('None')),
-                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
-                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
-                                  ],
-                                  onChanged: (val) => setModalState(() => notarialFeeType = val ?? 'none'),
-                                ),
-                              ),
-                              if (notarialFeeType != 'none') ...[
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: notarialFeeCtrl,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: InputDecoration(
-                                      labelText: notarialFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
-                                      border: const OutlineInputBorder(),
+                                          if (schedPreview.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            Text('Installment Schedule: ${schedPreview.length} period(s) @ ${LoanUtils.formatCurrency(schedPreview.first.amount, state.currencyCode)} / period',
+                                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ] else ...[
+                                          const Text('Enter loan principal amount to view live calculation summary.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                        ],
+                                      ],
                                     ),
-                                    onChanged: (_) => setModalState(() {}),
                                   ),
                                 ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 8),
 
-                          // Credit Life Insurance Fee
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: insuranceFeeType,
-                                  decoration: const InputDecoration(labelText: 'Credit Life Insurance', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'none', child: Text('None')),
-                                    DropdownMenuItem(value: 'fixed', child: Text('Fixed Amount')),
-                                    DropdownMenuItem(value: 'percent', child: Text('Percent (%)')),
-                                  ],
-                                  onChanged: (val) => setModalState(() => insuranceFeeType = val ?? 'none'),
-                                ),
-                              ),
-                              if (insuranceFeeType != 'none') ...[
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: insuranceFeeCtrl,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: InputDecoration(
-                                      labelText: insuranceFeeType == 'fixed' ? 'Amount' : 'Rate (%)',
-                                      border: const OutlineInputBorder(),
-                                    ),
-                                    onChanged: (_) => setModalState(() {}),
-                                  ),
-                                ),
+                                if (validationError != null) ...[
+                                  Text(validationError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                                  const SizedBox(height: 8),
+                                ],
                               ],
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: selectedPenaltyType,
-                                  decoration: const InputDecoration(labelText: 'Penalty / Multa Type', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'none', child: Text('None')),
-                                    DropdownMenuItem(value: 'fixed_per_period', child: Text('Fixed per overdue period')),
-                                    DropdownMenuItem(value: 'percent_per_period', child: Text('Percent (%) per overdue period')),
-                                    DropdownMenuItem(value: 'fixed_once', child: Text('Fixed once when overdue')),
-                                  ],
-                                  onChanged: (val) {
-                                    if (val != null) setModalState(() => selectedPenaltyType = val);
-                                  },
-                                ),
-                              ),
-                              if (selectedPenaltyType != 'none') ...[
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: penaltyValueCtrl,
-                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                    decoration: InputDecoration(
-                                      labelText: selectedPenaltyType == 'percent_per_period' ? 'Penalty Rate (%)' : 'Penalty Amount',
-                                      border: const OutlineInputBorder(),
-                                    ),
-                                    onChanged: (_) => setModalState(() {}),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: dateCtrl,
-                            readOnly: true,
-                            decoration: const InputDecoration(
-                              labelText: 'Disbursement Date',
-                              suffixIcon: Icon(Icons.calendar_today, size: 18),
-                              border: OutlineInputBorder(),
-                            ),
-                            onTap: () async {
-                              DateTime initial;
-                              try {
-                                initial = DateTime.parse(dateCtrl.text.trim());
-                              } catch (_) {
-                                initial = DateTime.now();
-                              }
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: initial,
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) {
-                                setModalState(() {
-                                  dateCtrl.text = picked.toIso8601String().split('T')[0];
-                                });
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: notesCtrl,
-                            decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder()),
-                          ),
-                        ],
+                            );
+                          },
+                        ),
                       ),
                     ),
-
-                    const SizedBox(height: 16),
+                    const Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
                         const SizedBox(width: 8),
                         ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF059669),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
                           onPressed: () async {
                             final penVal = double.tryParse(penaltyValueCtrl.text.trim()) ?? 0.0;
                             final purpose = purposeCtrl.text.trim().isEmpty ? 'Working Capital' : purposeCtrl.text.trim();
@@ -815,7 +887,10 @@ class _LoansScreenState extends State<LoansScreen> {
                               );
                             }
                           },
-                          child: Text(state.isSoloMode ? 'Create Active Loan' : 'Create Pending Loan'),
+                          child: Text(
+                            state.isSoloMode ? 'Create Active Loan' : 'Create Pending Loan',
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),
