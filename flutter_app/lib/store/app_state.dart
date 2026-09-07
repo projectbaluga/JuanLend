@@ -556,4 +556,111 @@ class AppState extends ChangeNotifier {
 
     notifyListeners();
   }
+
+  Future<void> rolloverLoan(
+    String loanId, {
+    required int extensionPeriods,
+    double extensionFeeValue = 0.0,
+    String extensionFeeType = 'fixed',
+  }) async {
+    if (_currentUser == null || (!isSoloMode && _currentUser!.role != 'officer' && _currentUser!.role != 'approver')) {
+      throw StateError('Unauthorized: Role "${_currentUser?.role ?? "unauthenticated"}" cannot perform loan rollover.');
+    }
+
+    final loan = loans.firstWhere((l) => l.id == loanId);
+    if (loan.status != 'active') {
+      throw ArgumentError('Cannot rollover loan with status "${loan.status}". Only active loans can be rolled over.');
+    }
+
+    if (extensionPeriods <= 0) {
+      throw ArgumentError('Extension periods must be greater than 0.');
+    }
+
+    final stats = LoanUtils.getLoanStats(loan);
+    final remainingBalance = stats.outstandingBalance > 0 ? stats.outstandingBalance : loan.principal;
+
+    final newTermCount = loan.termCount + extensionPeriods;
+    final extensionFee = LoanUtils.calculateFeeAmount(
+      remainingBalance,
+      extensionFeeType,
+      extensionFeeValue,
+      termCount: extensionPeriods,
+      frequency: loan.repaymentFrequency,
+    );
+
+    final newServiceFeeValue = loan.serviceFeeValue + extensionFee;
+
+    final updatedSchedule = LoanUtils.generateSchedule(
+      remainingBalance,
+      loan.interestRate,
+      extensionPeriods,
+      DateTime.now().toIso8601String().split('T')[0],
+      repaymentFrequency: loan.repaymentFrequency,
+      interestMethod: loan.interestMethod,
+    );
+
+    // Combine original remaining schedule / adjustments with new schedule
+    final newScheduleList = [
+      ...loan.schedule,
+      ...updatedSchedule.map((inst) => inst.copyWith(
+            installmentNo: loan.schedule.length + inst.installmentNo,
+          )),
+    ];
+
+    await store.updateItem('loans', loanId, {
+      'term_count': newTermCount,
+      'term_months': loan.repaymentFrequency == 'monthly' ? newTermCount : loan.termMonths,
+      'service_fee_type': 'fixed',
+      'service_fee_value': newServiceFeeValue,
+      'schedule': newScheduleList.map((e) => e.toMap()).toList(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+
+    notifyListeners();
+  }
+
+  Future<void> topUpLoan(
+    String loanId, {
+    required double additionalPrincipal,
+    String? newDisbursementDate,
+  }) async {
+    if (_currentUser == null || (!isSoloMode && _currentUser!.role != 'officer' && _currentUser!.role != 'approver')) {
+      throw StateError('Unauthorized: Role "${_currentUser?.role ?? "unauthenticated"}" cannot top up loans.');
+    }
+
+    final loan = loans.firstWhere((l) => l.id == loanId);
+    if (loan.status != 'active') {
+      throw ArgumentError('Cannot top up loan with status "${loan.status}". Only active loans can be topped up.');
+    }
+
+    if (additionalPrincipal <= 0) {
+      throw ArgumentError('Additional principal must be greater than 0.');
+    }
+
+    final newPrincipal = LoanUtils.round2(loan.principal + additionalPrincipal);
+    if (newPrincipal > 10000000) {
+      throw ArgumentError('New total principal exceeds maximum allowed limit (₱10,000,000).');
+    }
+
+    final disbDate = (newDisbursementDate != null && newDisbursementDate.isNotEmpty)
+        ? newDisbursementDate
+        : (loan.disbursementDate.isNotEmpty ? loan.disbursementDate : DateTime.now().toIso8601String().split('T')[0]);
+
+    final newSchedule = LoanUtils.generateSchedule(
+      newPrincipal,
+      loan.interestRate,
+      loan.termCount,
+      disbDate,
+      repaymentFrequency: loan.repaymentFrequency,
+      interestMethod: loan.interestMethod,
+    );
+
+    await store.updateItem('loans', loanId, {
+      'principal': newPrincipal,
+      'schedule': newSchedule.map((e) => e.toMap()).toList(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+
+    notifyListeners();
+  }
 }

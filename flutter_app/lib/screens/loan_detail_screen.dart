@@ -306,23 +306,46 @@ class LoanDetailScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () {
-                    final soaText = ReceiptUtils.generateStatementOfAccount(
-                      businessName: state.businessName,
-                      borrower: borrower,
-                      loan: loan,
-                      stats: stats,
-                      currencyCode: state.currencyCode,
-                    );
-                    _showTextDialog(
-                      context: context,
-                      title: 'Statement of Account (SOA)',
-                      textContent: soaText,
-                    );
-                  },
-                  icon: const Icon(Icons.receipt_long, size: 16),
-                  label: const Text('Statement of Account'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        final dsText = ReceiptUtils.generateDisclosureStatement(
+                          businessName: state.businessName,
+                          borrower: borrower,
+                          loan: loan,
+                          currencyCode: state.currencyCode,
+                        );
+                        _showTextDialog(
+                          context: context,
+                          title: 'Truth in Lending Disclosure Statement',
+                          textContent: dsText,
+                        );
+                      },
+                      icon: const Icon(Icons.description, size: 16),
+                      label: const Text('Disclosure Statement'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        final soaText = ReceiptUtils.generateStatementOfAccount(
+                          businessName: state.businessName,
+                          borrower: borrower,
+                          loan: loan,
+                          stats: stats,
+                          currencyCode: state.currencyCode,
+                        );
+                        _showTextDialog(
+                          context: context,
+                          title: 'Statement of Account (SOA)',
+                          textContent: soaText,
+                        );
+                      },
+                      icon: const Icon(Icons.receipt_long, size: 16),
+                      label: const Text('Statement of Account'),
+                    ),
+                  ],
                 ),
                 Row(
                   children: [

@@ -289,4 +289,115 @@ void main() {
       expect(LoanUtils.validateLoanParams(principal: 1000, interestRate: 10, termCount: 12, repaymentFrequency: 'monthly', penaltyValue: 0), isNull);
     });
   });
+
+  group('EIR, APR, Layered Fees & Philippine Regulatory Caps Tests', () {
+    test('computeNominalRate, computeEffectiveInterestRate, and computeAPR calculate correctly', () {
+      final monthlyNIR = LoanUtils.computeNominalRate(
+        interestRate: 12.0,
+        interestMethod: 'reducing',
+        repaymentFrequency: 'monthly',
+        termCount: 12,
+        principal: 10000.0,
+      );
+      expect(monthlyNIR, 1.0); // 12% / 12 = 1.0% per month
+
+      final monthlyEIR = LoanUtils.computeEffectiveInterestRate(
+        principal: 10000.0,
+        interestRate: 12.0,
+        termCount: 12,
+        repaymentFrequency: 'monthly',
+        interestMethod: 'reducing',
+        totalFees: 300.0, // ₱300 upfront processing fee
+      );
+      expect(monthlyEIR, greaterThan(monthlyNIR)); // EIR > NIR due to upfront fee
+      expect(monthlyEIR, closeTo(1.48, 0.1));
+
+      final apr = LoanUtils.computeAPR(effectiveMonthlyRate: monthlyEIR);
+      expect(apr, closeTo(monthlyEIR * 12, 0.01));
+    });
+
+    test('calculateTotalUpfrontFees handles percent_per_day daily service fee (Tala model)', () {
+      // ₱1,000 principal, 0.5% per day service fee for 15 days
+      final totalFees = LoanUtils.calculateTotalUpfrontFees(
+        principal: 1000.0,
+        serviceFeeType: 'percent_per_day',
+        serviceFeeValue: 0.5,
+        termCount: 15,
+        frequency: 'daily',
+      );
+      // 0.5% * 15 days = 7.5% of 1,000 = ₱75.00
+      expect(totalFees, 75.0);
+    });
+
+    test('isCoveredSmallLoan identifies loans <= P10,000 and <= 4 months', () {
+      expect(
+        LoanUtils.isCoveredSmallLoan(principal: 5000, termCount: 3, repaymentFrequency: 'monthly'),
+        isTrue,
+      );
+      expect(
+        LoanUtils.isCoveredSmallLoan(principal: 15000, termCount: 3, repaymentFrequency: 'monthly'),
+        isFalse, // principal > 10k
+      );
+      expect(
+        LoanUtils.isCoveredSmallLoan(principal: 5000, termCount: 6, repaymentFrequency: 'monthly'),
+        isFalse, // term > 4 months (180 days)
+      );
+    });
+
+    test('validateLoanParams enforces SEC/BSP regulatory caps on covered loans', () {
+      // Nominal rate > 6% per month (e.g. 84% annual = 7%/month)
+      final errHighNIR = LoanUtils.validateLoanParams(
+        principal: 5000,
+        interestRate: 84.0, // 7% / mo
+        termCount: 3,
+        repaymentFrequency: 'monthly',
+        penaltyValue: 0,
+        enforceCoveredCaps: true,
+      );
+      expect(errHighNIR, contains('Nominal interest rate'));
+
+      // Penalty > 5% per month
+      final errHighPenalty = LoanUtils.validateLoanParams(
+        principal: 5000,
+        interestRate: 12.0,
+        termCount: 3,
+        repaymentFrequency: 'monthly',
+        penaltyValue: 10.0,
+        penaltyType: 'percent_per_period',
+        enforceCoveredCaps: true,
+      );
+      expect(errHighPenalty, contains('Penalty rate'));
+    });
+
+    test('calculatePenalty enforces 100%-of-principal total-cost cap (Interest + Fees + Penalties <= Principal)', () {
+      final schedule = [
+        ScheduleInstallment(installmentNo: 1, dueDate: '2025-01-01', amount: 1000.0, principal: 800.0, interest: 200.0, balance: 0.0),
+      ];
+
+      // Principal = 1000. Interest = 200. Fees = 300. Max penalty allowed = 1000 - 200 - 300 = 500.
+      final loan = Loan(
+        id: 'cap_test_loan',
+        borrowerId: 'b1',
+        principal: 1000.0,
+        interestRate: 20.0,
+        termMonths: 1,
+        purpose: 'Cap Test',
+        status: 'active',
+        disbursementDate: '2025-01-01',
+        processingFeeType: 'fixed',
+        processingFeeValue: 300.0,
+        penaltyType: 'fixed_per_period',
+        penaltyValue: 800.0, // Attempted penalty = 800
+        schedule: schedule,
+        payments: [],
+        notes: '',
+      );
+
+      final statusSched = LoanUtils.getScheduleWithStatus(schedule, [], 'active', DateTime.parse('2025-02-01'));
+      final penalty = LoanUtils.calculatePenalty(loan, statusSched, DateTime.parse('2025-02-01'));
+
+      // Penalty should be capped at 500.0 so Total Cost = 200 + 300 + 500 = 1000 (100% of principal)
+      expect(penalty, 500.0);
+    });
+  });
 }
