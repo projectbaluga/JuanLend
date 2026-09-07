@@ -72,6 +72,7 @@ class _LoansScreenState extends State<LoansScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      constraints: const BoxConstraints(maxWidth: 760),
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setModalState) {

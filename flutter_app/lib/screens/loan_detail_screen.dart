@@ -280,16 +280,28 @@ class LoanDetailScreen extends StatelessWidget {
         (state.isSoloMode || state.currentUser!.role == 'officer' || state.currentUser!.role == 'approver');
     final canApproveThisLoan = isApprover && (state.isSoloMode || loan.createdBy != state.currentUser?.id);
 
-    final deductionAmount = LoanUtils.calculateUpfrontDeduction(
-      loan.principal,
-      loan.upfrontDeductionType,
-      loan.upfrontDeductionValue,
+    final totalFees = LoanUtils.calculateTotalFeesForLoan(loan);
+    final netDisbursed = LoanUtils.calculateNetDisbursedForLoan(loan);
+
+    final monthlyNIR = LoanUtils.computeNominalRate(
+      interestRate: loan.interestRate,
+      interestMethod: loan.interestMethod,
+      repaymentFrequency: loan.repaymentFrequency,
+      termCount: loan.termCount,
+      principal: loan.principal,
     );
-    final netDisbursed = LoanUtils.calculateNetDisbursed(
-      loan.principal,
-      loan.upfrontDeductionType,
-      loan.upfrontDeductionValue,
+
+    final monthlyEIR = LoanUtils.computeEffectiveInterestRate(
+      principal: loan.principal,
+      interestRate: loan.interestRate,
+      termCount: loan.termCount,
+      repaymentFrequency: loan.repaymentFrequency,
+      interestMethod: loan.interestMethod,
+      totalFees: totalFees,
+      schedule: loan.schedule,
     );
+
+    final apr = LoanUtils.computeAPR(effectiveMonthlyRate: monthlyEIR);
 
     return Scaffold(
       appBar: AppBar(
@@ -533,9 +545,18 @@ class LoanDetailScreen extends StatelessWidget {
                     'Principal: ${LoanUtils.formatCurrency(loan.principal, state.currencyCode)} @ ${loan.interestRate}% • ${loan.termCount} ${loan.repaymentFrequency} period(s) (${loan.interestMethod.replaceAll('_', ' ')})',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                  if (loan.upfrontDeductionType != 'none') ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('NIR: ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                      Text('EIR: ${monthlyEIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                      Text('APR: ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                    ],
+                  ),
+                  if (totalFees > 0) ...[
                     const SizedBox(height: 4),
-                    Text('Upfront Deduction: -${LoanUtils.formatCurrency(deductionAmount, state.currencyCode)} (${loan.upfrontDeductionType == 'percent' ? '${loan.upfrontDeductionValue}%' : 'fixed'})',
+                    Text('Itemized Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
                         style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
                     Text('Net Disbursed: ${LoanUtils.formatCurrency(netDisbursed, state.currencyCode)}',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
@@ -672,97 +693,113 @@ class LoanDetailScreen extends StatelessWidget {
                 children: [
                   const Text('Amortization Schedule', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
-                  ResponsiveContainer.isDesktop(context)
-                      ? SingleChildScrollView(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final availableWidth = constraints.maxWidth;
+                      final isWide = availableWidth >= 600;
+
+                      if (isWide) {
+                        final dynamicFontSize = availableWidth > 1000 ? 13.0 : (availableWidth > 800 ? 12.0 : 11.0);
+                        final dynamicSpacing = (availableWidth - 500) / 10;
+                        final colSpacing = dynamicSpacing.clamp(12.0, 28.0);
+
+                        return SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columnSpacing: 16,
-                            headingRowHeight: 32,
-                            dataRowMinHeight: 36,
-                            dataRowMaxHeight: 36,
-                            columns: const [
-                              DataColumn(label: Text('#', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Due Date', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Amount', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Principal', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Interest', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text('Paid', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text('Remaining', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                                  DataColumn(label: Text('Balance', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                              DataColumn(label: Text('Status', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                            ],
-                            rows: stats.scheduleWithStatus.map((inst) {
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text('${inst.installmentNo}', style: const TextStyle(fontSize: 11))),
-                                  DataCell(Text(LoanUtils.formatDate(inst.dueDate), style: const TextStyle(fontSize: 11))),
-                                  DataCell(Text(LoanUtils.formatCurrency(inst.amount, state.currencyCode), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                                  DataCell(Text(LoanUtils.formatCurrency(inst.principal, state.currencyCode), style: const TextStyle(fontSize: 11, color: Colors.grey))),
-                                  DataCell(Text(LoanUtils.formatCurrency(inst.interest, state.currencyCode), style: const TextStyle(fontSize: 11, color: Colors.grey))),
-                                      DataCell(Text(LoanUtils.formatCurrency(inst.paidAmount, state.currencyCode), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF10B981)))),
-                                      DataCell(Text(LoanUtils.formatCurrency(inst.remainingAmount, state.currencyCode), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: inst.remainingAmount > 0 ? Colors.redAccent : Colors.grey))),
-                                      DataCell(Text(LoanUtils.formatCurrency(inst.balance, state.currencyCode), style: const TextStyle(fontSize: 11, color: Colors.grey))),
-                                  DataCell(AppBadge(text: inst.status, variant: inst.status)),
-                                ],
-                              );
-                            }).toList(),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minWidth: availableWidth),
+                            child: DataTable(
+                              columnSpacing: colSpacing,
+                              headingRowHeight: 36,
+                              dataRowMinHeight: 38,
+                              dataRowMaxHeight: 38,
+                              columns: [
+                                DataColumn(label: Text('#', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Due Date', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Amount', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Principal', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Interest', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Paid', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Remaining', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Balance', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                DataColumn(label: Text('Status', style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                              ],
+                              rows: stats.scheduleWithStatus.map((inst) {
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text('${inst.installmentNo}', style: TextStyle(fontSize: dynamicFontSize))),
+                                    DataCell(Text(LoanUtils.formatDate(inst.dueDate), style: TextStyle(fontSize: dynamicFontSize))),
+                                    DataCell(Text(LoanUtils.formatCurrency(inst.amount, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold))),
+                                    DataCell(Text(LoanUtils.formatCurrency(inst.principal, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, color: Colors.grey))),
+                                    DataCell(Text(LoanUtils.formatCurrency(inst.interest, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, color: Colors.grey))),
+                                    DataCell(Text(LoanUtils.formatCurrency(inst.paidAmount, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)))),
+                                    DataCell(Text(LoanUtils.formatCurrency(inst.remainingAmount, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold, color: inst.remainingAmount > 0 ? Colors.redAccent : Colors.grey))),
+                                    DataCell(Text(LoanUtils.formatCurrency(inst.balance, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, color: Colors.grey))),
+                                    DataCell(AppBadge(text: inst.status, variant: inst.status)),
+                                  ],
+                                );
+                              }).toList(),
+                            ),
                           ),
-                        )
-                      : ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: stats.scheduleWithStatus.length,
-                          separatorBuilder: (_, __) => const Divider(height: 12),
-                          itemBuilder: (context, idx) {
-                            final inst = stats.scheduleWithStatus[idx];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2.0),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '#${inst.installmentNo} • Due ${LoanUtils.formatDate(inst.dueDate)}',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                        );
+                      }
+
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: stats.scheduleWithStatus.length,
+                        separatorBuilder: (_, __) => const Divider(height: 12),
+                        itemBuilder: (context, idx) {
+                          final inst = stats.scheduleWithStatus[idx];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '#${inst.installmentNo} • Due ${LoanUtils.formatDate(inst.dueDate)}',
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'P: ${LoanUtils.formatCurrency(inst.principal, state.currencyCode)} | I: ${LoanUtils.formatCurrency(inst.interest, state.currencyCode)}',
+                                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Paid: ${LoanUtils.formatCurrency(inst.paidAmount, state.currencyCode)} | Rem: ${LoanUtils.formatCurrency(inst.remainingAmount, state.currencyCode)} | Bal: ${LoanUtils.formatCurrency(inst.balance, state.currencyCode)}',
+                                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    SizedBox(
+                                      width: 120,
+                                      child: AppProgressBar(
+                                        percentage: inst.amount > 0 ? ((inst.paidAmount / inst.amount) * 100).round() : 0,
+                                        showLabel: false,
                                       ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'P: ${LoanUtils.formatCurrency(inst.principal, state.currencyCode)} | I: ${LoanUtils.formatCurrency(inst.interest, state.currencyCode)}',
-                                        style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Paid: ${LoanUtils.formatCurrency(inst.paidAmount, state.currencyCode)} | Rem: ${LoanUtils.formatCurrency(inst.remainingAmount, state.currencyCode)} | Bal: ${LoanUtils.formatCurrency(inst.balance, state.currencyCode)}',
-                                        style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      SizedBox(
-                                        width: 120,
-                                        child: AppProgressBar(
-                                          percentage: inst.amount > 0 ? ((inst.paidAmount / inst.amount) * 100).round() : 0,
-                                          showLabel: false,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        LoanUtils.formatCurrency(inst.amount, state.currencyCode),
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      AppBadge(text: inst.status, variant: inst.status),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      LoanUtils.formatCurrency(inst.amount, state.currencyCode),
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    AppBadge(text: inst.status, variant: inst.status),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ],
               ),
             ),

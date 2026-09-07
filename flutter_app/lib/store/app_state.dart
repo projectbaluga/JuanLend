@@ -637,6 +637,19 @@ class AppState extends ChangeNotifier {
       throw ArgumentError('Additional principal must be greater than 0.');
     }
 
+    // Verify credit limit based on borrower monthly income assessment if available
+    final borrowerMatch = borrowers.where((b) => b.id == loan.borrowerId).toList();
+    if (borrowerMatch.isNotEmpty) {
+      final borrower = borrowerMatch.first;
+      final assessment = LoanUtils.assessBorrower(borrower, loans);
+
+      // Max total outstanding debt allowed = 5x monthly income (or 50,000 if no income specified)
+      final creditLimit = borrower.monthlyIncome > 0 ? (borrower.monthlyIncome * 5.0) : 50000.0;
+      if ((loan.principal + additionalPrincipal) > creditLimit) {
+        throw ArgumentError('Top-up exceeds borrower credit limit (${LoanUtils.formatCurrency(creditLimit, currencyCode)}). Current assessment: DTI ${assessment.dtiPct}%.');
+      }
+    }
+
     final newPrincipal = LoanUtils.round2(loan.principal + additionalPrincipal);
     if (newPrincipal > 10000000) {
       throw ArgumentError('New total principal exceeds maximum allowed limit (₱10,000,000).');
