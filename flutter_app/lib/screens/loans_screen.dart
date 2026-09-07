@@ -216,7 +216,13 @@ class _LoansScreenState extends State<LoansScreen> {
                           child: TextField(
                             controller: rateCtrl,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            decoration: const InputDecoration(labelText: 'Rate (%) *', border: OutlineInputBorder()),
+                            decoration: InputDecoration(
+                              labelText: 'Rate (%) *',
+                              helperText: (selectedMethod == 'reducing' || selectedMethod == 'interest_only')
+                                  ? '% per annum (taunan)'
+                                  : '% total sa buong term',
+                              border: const OutlineInputBorder(),
+                            ),
                             onChanged: (_) => setModalState(() {}),
                           ),
                         ),
@@ -278,47 +284,105 @@ class _LoansScreenState extends State<LoansScreen> {
                           children: [
                             if (capBreached) ...[
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: const [
                                   Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
                                   SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      'REGULATORY CAP BREACH WARNING (SEC MC 3 / BSP Circular 1133)',
+                                      'BABALA: Lumampas sa legal na limit ng SEC/BSP para sa maliliit na loan (SEC MC 3 / BSP Circular 1133). Ibaba ang interest rate o fees para maituloy nang legal.',
                                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 8),
                             ],
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                            // Highlight top 3 figures with large readable fonts
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.spaceBetween,
                               children: [
-                                Text('NIR: ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                Text('EIR: ${monthlyEIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
-                                Text('APR: ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Matatanggap ng Borrower (Net Disbursed)', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                    Text(LoanUtils.formatCurrency(netDisbursed, state.currencyCode),
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Kabuuang Babayaran (Total Repayable)', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                    Text(LoanUtils.formatCurrency(totalScheduled, state.currencyCode),
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text('Totoong Gastos / EIR ', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                        Tooltip(
+                                          message: 'EIR (Effective Interest Rate) — Ang totoong buong gastos ng loan kada buwan, kasama na ang lahat ng fees at interest.',
+                                          child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                        ),
+                                      ],
+                                    ),
+                                    Text('${monthlyEIR.toStringAsFixed(1)}% / buwan',
+                                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                                  ],
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 6),
-                            Text('Itemized Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
-                                style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
-                            const SizedBox(height: 2),
-                            Text('Net Disbursed: ${LoanUtils.formatCurrency(netDisbursed, state.currencyCode)}',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
-                            const SizedBox(height: 6),
+
+                            const SizedBox(height: 8),
+                            const Divider(height: 8),
+                            const SizedBox(height: 4),
+
+                            // Secondary details with Plain Language and Tooltips
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text('Basic Interest / NIR: ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                    const SizedBox(width: 2),
+                                    Tooltip(
+                                      message: 'NIR (Nominal Interest Rate) — Ang batayang interest rate ng loan, hindi pa kasama ang karagdagang fees.',
+                                      child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text('Taunang Rate / APR: ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                    const SizedBox(width: 2),
+                                    Tooltip(
+                                      message: 'APR (Annual Percentage Rate) — Ang taunang katumbas ng lahat ng gastos sa loan kung ie-extend ng isang taon.',
+                                      child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                                Text('Mga Bayarin / Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
+                                    style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
+                                Text('Tubo / Interest: ${LoanUtils.formatCurrency(totalInterest, state.currencyCode)}',
+                                    style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                              ],
+                            ),
+
                             if (schedPreview.isNotEmpty) ...[
-                              Text('Installments: ${schedPreview.length} period(s) @ ${LoanUtils.formatCurrency(schedPreview.first.amount, state.currencyCode)} / period',
+                              const SizedBox(height: 6),
+                              Text('Hulog: ${schedPreview.length} period(s) @ ${LoanUtils.formatCurrency(schedPreview.first.amount, state.currencyCode)} / period',
                                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Total Interest: ${LoanUtils.formatCurrency(totalInterest, state.currencyCode)}',
-                                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                  Text('Total Repayable: ${LoanUtils.formatCurrency(totalScheduled, state.currencyCode)}',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                                ],
-                              ),
                             ],
                           ],
                         ),
@@ -326,11 +390,17 @@ class _LoansScreenState extends State<LoansScreen> {
                       const SizedBox(height: 10),
                     ],
 
-                    // Advanced Options Collapsible ExpansionTile
+                    // Advanced Options Collapsible ExpansionTile with live fee summary
                     Theme(
                       data: Theme.of(ctx).copyWith(dividerColor: Colors.transparent),
                       child: ExpansionTile(
-                        title: const Text('Advanced options', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        title: const Text('Advanced options & Itemized Fees', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          totalFees > 0
+                              ? 'Mga bayarin: ${LoanUtils.formatCurrency(totalFees, state.currencyCode)} kabuuan'
+                              : 'Mga bayarin: Wala pa (₱0)',
+                          style: TextStyle(fontSize: 11, color: totalFees > 0 ? Colors.redAccent : Colors.grey),
+                        ),
                         tilePadding: EdgeInsets.zero,
                         childrenPadding: const EdgeInsets.only(top: 4, bottom: 8),
                         children: [
@@ -353,18 +423,62 @@ class _LoansScreenState extends State<LoansScreen> {
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: DropdownButtonFormField<String>(
-                                  initialValue: selectedMethod,
-                                  decoration: const InputDecoration(labelText: 'Interest Method', border: OutlineInputBorder()),
-                                  items: const [
-                                    DropdownMenuItem(value: 'reducing', child: Text('Reducing Balance')),
-                                    DropdownMenuItem(value: 'flat', child: Text('Flat / Add-on ("5-6")')),
-                                    DropdownMenuItem(value: 'interest_only', child: Text('Interest-Only')),
-                                    DropdownMenuItem(value: 'one_time', child: Text('One-Time Payment')),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        initialValue: selectedMethod,
+                                        isExpanded: true,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Interest Method',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        items: const [
+                                          DropdownMenuItem(
+                                            value: 'reducing',
+                                            child: Text('Reducing Balance — bumababa ang interest habang nababayaran (Pag-IBIG/SSS style)', overflow: TextOverflow.ellipsis),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 'flat',
+                                            child: Text('Flat / Add-on — interest sa buong principal buong term ("5-6" style, mas mahal)', overflow: TextOverflow.ellipsis),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 'interest_only',
+                                            child: Text('Interest-Only — interest lang muna, principal sa dulo', overflow: TextOverflow.ellipsis),
+                                          ),
+                                          DropdownMenuItem(
+                                            value: 'one_time',
+                                            child: Text('One-Time Payment — isang bayaran sa dulo', overflow: TextOverflow.ellipsis),
+                                          ),
+                                        ],
+                                        onChanged: (val) {
+                                          if (val != null) setModalState(() => selectedMethod = val);
+                                        },
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.info_outline, size: 20, color: Colors.grey),
+                                      tooltip: 'Far mas mahal ang Flat/Add-on ("5-6") kaysa Reducing Balance dahil ang interest ng Flat ay kinakalkula mula sa orihinal na principal sa buong haba ng term kahit nabawasan na ang utang.',
+                                      onPressed: () {
+                                        showDialog(
+                                          context: context,
+                                          builder: (dialogCtx) => AlertDialog(
+                                            title: const Text('Paraan ng Pagkalkula ng Interest'),
+                                            content: const Text(
+                                              '• Reducing Balance: Bumababa ang binabayarang interest buwan-buwan dahil sa natitirang utang na lang ito kinakalkula (halimbawa: bank, SSS, Pag-IBIG loans).\n\n'
+                                              '• Flat / Add-on ("5-6"): Ang interest ay kinakalkula batay sa buong orihinal na principal sa buong haba ng term. Mas mahal ito sa katunayan dahil hindi bumababa ang batayan ng interest kahit nagbabayad na ang borrower.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () => Navigator.pop(dialogCtx),
+                                                child: const Text('Naintindihan'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
                                   ],
-                                  onChanged: (val) {
-                                    if (val != null) setModalState(() => selectedMethod = val);
-                                  },
                                 ),
                               ),
                             ],

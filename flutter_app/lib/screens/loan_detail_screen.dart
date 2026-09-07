@@ -546,19 +546,51 @@ class LoanDetailScreen extends StatelessWidget {
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.spaceBetween,
                     children: [
-                      Text('NIR: ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                      Text('EIR: ${monthlyEIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
-                      Text('APR: ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Basic Interest / NIR: ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          const SizedBox(width: 2),
+                          Tooltip(
+                            message: 'NIR (Nominal Interest Rate) — Ang batayang interest rate ng loan, hindi pa kasama ang karagdagang fees.',
+                            child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Totoong Gastos / EIR: ${monthlyEIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                          const SizedBox(width: 2),
+                          Tooltip(
+                            message: 'EIR (Effective Interest Rate) — Ang totoong buong gastos ng loan kada buwan, kasama na ang lahat ng fees at interest.',
+                            child: const Icon(Icons.info_outline, size: 12, color: Color(0xFF0284C7)),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Taunang Rate / APR: ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                          const SizedBox(width: 2),
+                          Tooltip(
+                            message: 'APR (Annual Percentage Rate) — Ang taunang katumbas ng lahat ng gastos sa loan kung ie-extend ng isang taon.',
+                            child: const Icon(Icons.info_outline, size: 12, color: Color(0xFF7C3AED)),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                   if (totalFees > 0) ...[
-                    const SizedBox(height: 4),
-                    Text('Itemized Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
+                    const SizedBox(height: 6),
+                    Text('Itemized Fees / Mga Bayarin: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
                         style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
-                    Text('Net Disbursed: ${LoanUtils.formatCurrency(netDisbursed, state.currencyCode)}',
+                    Text('Matatanggap ng Borrower / Net Disbursed: ${LoanUtils.formatCurrency(netDisbursed, state.currencyCode)}',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
                   ],
                   const SizedBox(height: 12),
