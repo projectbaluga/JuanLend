@@ -554,10 +554,10 @@ class LoanDetailScreen extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Basic Interest / NIR: ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                          Text('Basic Interest (NIR): ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                           const SizedBox(width: 2),
                           Tooltip(
-                            message: 'NIR (Nominal Interest Rate) — Ang batayang interest rate ng loan, hindi pa kasama ang karagdagang fees.',
+                            message: 'NIR (Nominal Interest Rate) — Base interest rate of the loan, excluding additional fees.',
                             child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
                           ),
                         ],
@@ -565,10 +565,10 @@ class LoanDetailScreen extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Totoong Gastos / EIR: ${monthlyEIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
+                          Text('True Monthly Cost (EIR): ${monthlyEIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
                           const SizedBox(width: 2),
                           Tooltip(
-                            message: 'EIR (Effective Interest Rate) — Ang totoong buong gastos ng loan kada buwan, kasama na ang lahat ng fees at interest.',
+                            message: 'EIR (Effective Interest Rate) — True total monthly loan cost, including all fees and interest.',
                             child: const Icon(Icons.info_outline, size: 12, color: Color(0xFF0284C7)),
                           ),
                         ],
@@ -576,10 +576,10 @@ class LoanDetailScreen extends StatelessWidget {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Taunang Rate / APR: ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
+                          Text('Annualized Rate (APR): ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
                           const SizedBox(width: 2),
                           Tooltip(
-                            message: 'APR (Annual Percentage Rate) — Ang taunang katumbas ng lahat ng gastos sa loan kung ie-extend ng isang taon.',
+                            message: 'APR (Annual Percentage Rate) — Annual equivalent of all loan charges if extended for one year.',
                             child: const Icon(Icons.info_outline, size: 12, color: Color(0xFF7C3AED)),
                           ),
                         ],
@@ -588,9 +588,9 @@ class LoanDetailScreen extends StatelessWidget {
                   ),
                   if (totalFees > 0) ...[
                     const SizedBox(height: 6),
-                    Text('Itemized Fees / Mga Bayarin: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
+                    Text('Itemized Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
                         style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
-                    Text('Matatanggap ng Borrower / Net Disbursed: ${LoanUtils.formatCurrency(netDisbursed, state.currencyCode)}',
+                    Text('Borrower Receives (Net Disbursed): ${LoanUtils.formatCurrency(netDisbursed, state.currencyCode)}',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
                   ],
                   const SizedBox(height: 12),
@@ -640,7 +640,7 @@ class LoanDetailScreen extends StatelessWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Penalty / Multa', style: TextStyle(fontSize: 10, color: Colors.redAccent)),
+                            const Text('Penalty', style: TextStyle(fontSize: 10, color: Colors.redAccent)),
                             Text(LoanUtils.formatCurrency(stats.penaltyAmount, state.currencyCode),
                                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.redAccent)),
                           ],
