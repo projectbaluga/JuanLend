@@ -537,6 +537,77 @@ void main() {
       expect(stats.creditBalance, 50.0);
     });
 
+    test('allPayments getter flattens, joins borrowers, sorts descending, and handles legacy payments', () async {
+      await appState.createUser('officer_log', 'officer123', 'officer');
+      await appState.login('officer_log', 'officer123');
+
+      final borrower = Borrower(
+        id: 'bor_log_1',
+        fullName: 'Payment Log Borrower',
+        email: 'log@example.com',
+        phone: '09123456789',
+        address: '123 Log St',
+        idNumber: 'ID-LOG',
+        employment: 'Employed',
+        monthlyIncome: 25000.0,
+        creditScore: 75,
+        riskRating: 'low',
+        notes: '',
+      );
+      await appState.addBorrower(borrower);
+
+      final legacyPayment = Payment.fromMap({
+        'id': 'p_legacy_1',
+        'date': '2026-01-10',
+        'amount': 500.0,
+        'method': 'Cash',
+        'note': 'Legacy Payment Note',
+      });
+      expect(legacyPayment.recordedBy, '');
+      expect(legacyPayment.recordedByRole, '');
+      expect(legacyPayment.recordedAt, '');
+
+      final loan1 = Loan(
+        id: 'loan_log_1',
+        borrowerId: 'bor_log_1',
+        principal: 5000.0,
+        interestRate: 10.0,
+        termMonths: 6,
+        purpose: 'Payment Log Loan 1',
+        status: 'active',
+        disbursementDate: '2026-01-01',
+        schedule: [],
+        payments: [legacyPayment],
+        notes: '',
+      );
+      await appState.addLoan(loan1);
+
+      final newPayment = Payment(
+        id: 'p_new_1',
+        date: '2026-02-15',
+        amount: 750.0,
+        method: 'GCash / E-Wallet',
+        note: 'New Payment Note',
+      );
+      await appState.recordPayment('loan_log_1', newPayment);
+
+      final allPayments = appState.allPayments;
+      expect(allPayments.isNotEmpty, isTrue);
+
+      final latestEntry = allPayments.firstWhere((e) => e.payment.id == 'p_new_1');
+      expect(latestEntry.payment.amount, 750.0);
+      expect(latestEntry.borrower.fullName, 'Payment Log Borrower');
+      expect(latestEntry.loan.purpose, 'Payment Log Loan 1');
+      expect(latestEntry.payment.recordedBy, 'officer_log');
+      expect(latestEntry.payment.recordedByRole, 'officer');
+      expect(latestEntry.payment.recordedAt.isNotEmpty, isTrue);
+
+      final legacyEntry = allPayments.firstWhere((e) => e.payment.id == 'p_legacy_1');
+      expect(legacyEntry.payment.recordedBy, '');
+
+      expect(allPayments.first.payment.date.compareTo(allPayments.last.payment.date) >= 0, isTrue);
+    });
+
     test('rolloverLoan and topUpLoan work correctly with permissions and limits', () async {
       await appState.createUser('officer_rt', 'officer123', 'officer');
       await appState.login('officer_rt', 'officer123');
