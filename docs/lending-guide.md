@@ -6,7 +6,7 @@ A plain-English walkthrough for lenders. No technical background needed. This ex
 When you give out a loan in MicroLend, there are three ways you earn or protect your money, and they work independently:
 1. Interest (Interest Method) — the profit added on top of the money you lend. The borrower pays this back over time.
 2. Upfront Deduction — a fee you subtract before handing over the cash. The borrower gets less than the loan amount, but still owes the full amount.
-3. Penalty (Multa) — an extra charge that only applies if the borrower pays late.
+3. Penalty — an extra charge that only applies if the borrower pays late.
 You can use all three at once, or just one.
 
 ## Part 2 — Filling Out the Form, Field by Field
@@ -17,7 +17,7 @@ You can use all three at once, or just one.
 - Rate (%): The interest rate. For some methods this is treated as a yearly rate — see the warning below.
 - Term: How many payment periods. The label changes based on frequency (months, weeks, or days).
 - Upfront Deduction: None / Fixed Amount / Percentage — a fee taken out before you hand over the cash.
-- Penalty / Multa: None / Fixed / Percent / Fixed once — the late charge if the borrower misses a due date.
+- Penalty: None / Fixed / Percent / Fixed once — the late charge if the borrower misses a due date.
 - Purpose: Reason for the loan (for your records).
 - Disbursement Date: The date you release the money; due dates are counted from here.
 
@@ -50,7 +50,7 @@ Key: the borrower still owes the full loan amount even though they received less
 | Interest-Only | Interest goes up the most (grows steadily) |
 | One-Time | No effect — always a single payment |
 
-## Part 6 — Penalty / Multa Explained
+## Part 6 — Penalty Explained
 Penalties only apply if a payment becomes overdue. If the borrower always pays on time, no penalty is charged.
 - None — no late charge.
 - Fixed per overdue period — a set amount for each late period (e.g. 50 per late period).
