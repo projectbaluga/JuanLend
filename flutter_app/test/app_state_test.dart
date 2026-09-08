@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'package:cryptography/cryptography.dart';
 import 'package:microlend/models/borrower.dart';
 import 'package:microlend/models/credit_assessment.dart';
 import 'package:microlend/models/loan.dart';
@@ -12,7 +10,6 @@ import 'package:microlend/store/offline_store.dart';
 import 'package:microlend/store/app_state.dart';
 import 'package:microlend/utils/license_verifier.dart';
 import 'package:microlend/utils/loan_utils.dart';
-import 'package:microlend/utils/machine_id.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -392,12 +389,15 @@ void main() {
       expect(approved.status, 'active');
     });
 
-    test('borrower limit enforcement and device-bound license key unlock', () async {
-      MachineIdUtils.setMockMachineId('mock_target_machine_id_12345');
-      await appState.reload();
+    test('LicenseVerifier.verifyUnlockCode accurately verifies master code', () {
+      expect(LicenseVerifier.verifyUnlockCode('MICROLEND-FULL-UNLOCK'), isTrue);
+      expect(LicenseVerifier.verifyUnlockCode('  MICROLEND-FULL-UNLOCK  \n'), isTrue);
+      expect(LicenseVerifier.verifyUnlockCode('WRONG-CODE'), isFalse);
+      expect(LicenseVerifier.verifyUnlockCode(''), isFalse);
+    });
 
+    test('borrower limit enforcement, unlocking with master code, and lockFeatures', () async {
       expect(appState.isFeaturesUnlocked, isFalse);
-      expect(appState.machineId, 'mock_target_machine_id_12345');
 
       final initialCount = appState.borrowers.length;
       final neededToAdd = 5 - initialCount;
@@ -440,36 +440,21 @@ void main() {
         throwsStateError,
       );
 
-      // Generate test Ed25519 keypair
-      final algorithm = Ed25519();
-      final keyPair = await algorithm.newKeyPair();
-      final pubKey = await keyPair.extractPublicKey();
-      final testPubKeyHex = pubKey.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
-      // Sign valid machine ID
-      final validSig = await algorithm.sign(utf8.encode('mock_target_machine_id_12345'), keyPair: keyPair);
-      final validLicenseKey = base64.encode(validSig.bytes);
-
-      // Sign a DIFFERENT machine ID
-      final wrongMachineSig = await algorithm.sign(utf8.encode('different_machine_id_99999'), keyPair: keyPair);
-      final wrongMachineLicenseKey = base64.encode(wrongMachineSig.bytes);
-
-      // 1. Invalid / tampered key fails
-      final invalidRes = await appState.unlockFeatures('invalid_key_string', overridePublicKeyHex: testPubKeyHex);
-      expect(invalidRes, isFalse);
+      // 1. Invalid / empty code fails
+      final wrongRes = await appState.unlockFeatures('invalid_code_string');
+      expect(wrongRes, isFalse);
       expect(appState.isFeaturesUnlocked, isFalse);
 
-      // 2. License key for DIFFERENT machine fails
-      final wrongMachineRes = await appState.unlockFeatures(wrongMachineLicenseKey, overridePublicKeyHex: testPubKeyHex);
-      expect(wrongMachineRes, isFalse);
+      final emptyRes = await appState.unlockFeatures('');
+      expect(emptyRes, isFalse);
       expect(appState.isFeaturesUnlocked, isFalse);
 
-      // 3. Valid license key for CURRENT machine succeeds
-      final validRes = await appState.unlockFeatures(validLicenseKey, overridePublicKeyHex: testPubKeyHex);
-      expect(validRes, isTrue);
+      // 2. Correct master unlock code succeeds
+      final unlockRes = await appState.unlockFeatures('  MICROLEND-FULL-UNLOCK  ');
+      expect(unlockRes, isTrue);
       expect(appState.isFeaturesUnlocked, isTrue);
 
-      // 4. Adding 6th borrower succeeds now that features are unlocked
+      // 3. Adding 6th borrower succeeds when unlocked
       await appState.addBorrower(Borrower(
         id: 'b_lim_6',
         fullName: 'Borrower 6',
@@ -487,8 +472,14 @@ void main() {
 
       expect(appState.borrowers.length, 6);
 
-      // 5. Switching machine ID (e.g., copied SharedPreferences) causes startup re-verification to fail
-      MachineIdUtils.setMockMachineId('copied_to_another_device_77777');
+      // 4. Persistence across reload()
+      await appState.reload();
+      expect(appState.isFeaturesUnlocked, isTrue);
+
+      // 5. lockFeatures re-locks and persists
+      await appState.lockFeatures();
+      expect(appState.isFeaturesUnlocked, isFalse);
+
       await appState.reload();
       expect(appState.isFeaturesUnlocked, isFalse);
     });
@@ -590,49 +581,6 @@ void main() {
       final rolledOverLoan = appState.loans.firstWhere((l) => l.id == loan.id);
       expect(rolledOverLoan.termCount, 8);
       expect(rolledOverLoan.serviceFeeValue, 150.0);
-    });
-
-    test('activePublicKeyHex setting management, invalid rejection, and key verification', () async {
-      // 1. Default active key equals masterPublicKeyHex when unset
-      expect(appState.activePublicKeyHex, equals(LicenseVerifier.masterPublicKeyHex));
-
-      // 2. Reject invalid public key (not 64 hex characters)
-      expect(() => appState.setActivePublicKey('short_hex'), throwsArgumentError);
-      expect(() => appState.setActivePublicKey('zzzz' * 16), throwsArgumentError);
-      expect(appState.activePublicKeyHex, equals(LicenseVerifier.masterPublicKeyHex));
-
-      // 3. Generate custom keypair
-      final algorithm = Ed25519();
-      final customKeyPair = await algorithm.newKeyPair();
-      final customPubKey = await customKeyPair.extractPublicKey();
-      final customPubKeyHex = customPubKey.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-
-      // Sign mock machine ID with custom keypair
-      MachineIdUtils.setMockMachineId('configurable_key_machine_999');
-      await appState.reload();
-
-      final customSig = await algorithm.sign(utf8.encode('configurable_key_machine_999'), keyPair: customKeyPair);
-      final customLicenseKey = base64.encode(customSig.bytes);
-
-      // Verification fails under master key
-      final unlockFail = await appState.unlockFeatures(customLicenseKey);
-      expect(unlockFail, isFalse);
-      expect(appState.isFeaturesUnlocked, isFalse);
-
-      // Update active public key via setActivePublicKey
-      await appState.setActivePublicKey(customPubKeyHex);
-      expect(appState.activePublicKeyHex, equals(customPubKeyHex));
-      expect(store.getSetting('activePublicKeyHex', ''), equals(customPubKeyHex));
-
-      // Verification succeeds now with active key
-      final unlockSuccess = await appState.unlockFeatures(customLicenseKey);
-      expect(unlockSuccess, isTrue);
-      expect(appState.isFeaturesUnlocked, isTrue);
-
-      // Reloading appState persists custom public key and re-verifies active license key
-      await appState.reload();
-      expect(appState.activePublicKeyHex, equals(customPubKeyHex));
-      expect(appState.isFeaturesUnlocked, isTrue);
     });
   });
 }

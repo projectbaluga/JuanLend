@@ -443,19 +443,10 @@ class _FullFeaturesSection extends StatefulWidget {
 
 class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
   final TextEditingController _licenseCtrl = TextEditingController();
-  late final TextEditingController _pubKeyCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    final state = Provider.of<AppState>(context, listen: false);
-    _pubKeyCtrl = TextEditingController(text: state.activePublicKeyHex);
-  }
 
   @override
   void dispose() {
     _licenseCtrl.dispose();
-    _pubKeyCtrl.dispose();
     super.dispose();
   }
 
@@ -467,50 +458,8 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Full Features & Device License', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+          const Text('Full Features', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-
-          // Display Machine ID
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black26,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Device Fingerprint (Machine ID):', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                      const SizedBox(height: 2),
-                      SelectableText(
-                        state.machineId.isNotEmpty ? state.machineId : 'Detecting machine ID...',
-                        style: const TextStyle(fontSize: 11, fontFamily: 'monospace', fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.copy, size: 16),
-                  tooltip: 'Copy Machine ID',
-                  onPressed: () {
-                    if (state.machineId.isNotEmpty) {
-                      Clipboard.setData(ClipboardData(text: state.machineId));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Machine ID copied to clipboard! Send this ID to support for a license key.')),
-                      );
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 12),
 
           if (state.isFeaturesUnlocked) ...[
             Row(
@@ -520,7 +469,7 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
                   children: const [
                     Icon(Icons.check_circle, size: 18, color: Colors.greenAccent),
                     SizedBox(width: 8),
-                    Text('Full Features Unlocked (Device Bound)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    Text('Full Features Unlocked', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                   ],
                 ),
                 TextButton.icon(
@@ -532,7 +481,7 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
             ),
           ] else ...[
             const Text(
-              'Unlicensed edition is limited to 5 borrowers. Provide your Machine ID to obtain a device-bound license key.',
+              'Unlicensed edition is limited to 5 borrowers. Enter unlock code to enable full features.',
               style: TextStyle(fontSize: 11, color: Colors.grey),
             ),
             const SizedBox(height: 12),
@@ -542,7 +491,7 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
                   child: TextField(
                     controller: _licenseCtrl,
                     decoration: const InputDecoration(
-                      hintText: 'Enter device license key...',
+                      hintText: 'Enter unlock code...',
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       border: OutlineInputBorder(),
@@ -559,11 +508,11 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
                     if (success) {
                       _licenseCtrl.clear();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Full features successfully unlocked for this device!')),
+                        const SnackBar(content: Text('Full features successfully unlocked!')),
                       );
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invalid license key for this device ID')),
+                        const SnackBar(content: Text('Invalid unlock code')),
                       );
                     }
                   },
@@ -572,72 +521,9 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
               ],
             ),
           ],
-
-          const SizedBox(height: 12),
-          const Divider(height: 16),
-
-          // Advanced Public Key Configuration
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              title: const Text('Active License Public Key (advanced)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              subtitle: Text(
-                'Current: ${_truncateKey(state.activePublicKeyHex)}',
-                style: const TextStyle(fontSize: 10, color: Colors.grey, fontFamily: 'monospace'),
-              ),
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
-              children: [
-                const Text(
-                  'Configure runtime Ed25519 public key for license key verification without app rebuilds.',
-                  style: TextStyle(fontSize: 10, color: Colors.grey),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _pubKeyCtrl,
-                        style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                        decoration: const InputDecoration(
-                          labelText: 'Master Public Key (64 hex chars)',
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () async {
-                        try {
-                          await state.setActivePublicKey(_pubKeyCtrl.text.trim());
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Active license public key updated successfully!')),
-                          );
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Invalid public key — must be 64 hex characters')),
-                          );
-                        }
-                      },
-                      child: const Text('Save Public Key'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
-  }
-
-  String _truncateKey(String key) {
-    if (key.length <= 16) return key;
-    return '${key.substring(0, 8)}...${key.substring(key.length - 8)}';
   }
 }
 

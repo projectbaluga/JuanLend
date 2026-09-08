@@ -18,10 +18,8 @@ On every push to `main` and pull request, GitHub Actions automatically builds, a
 
 To download the latest APK or build artifacts, navigate to the **Actions** tab on GitHub, click the latest workflow run, and scroll down to **Artifacts**.
 
-### 🔑 License & Key Pair Tools Workflow (`.github/workflows/license-tools.yml`)
-Repo administrators can generate Ed25519 key pairs and device-bound license keys via GitHub Actions:
-- **`mode: keypair`**: Generates a new matching Ed25519 private key seed (hex) and public key (hex). Embed the public key in `flutter_app/lib/utils/license_verifier.dart` and save the private seed as the `LICENSE_PRIVATE_KEY` repository secret.
-- **`mode: license`**: Accepts a customer's `machine_id` input and signs it using `LICENSE_PRIVATE_KEY` to output a device-bound Base64 license key.
+### 🔑 App Licensing
+Full features (unlocking the 5-borrower limit) are enabled by entering the static master unlock code in the application Settings screen.
 
 ---
 
