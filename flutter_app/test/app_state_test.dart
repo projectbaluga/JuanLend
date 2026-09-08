@@ -10,6 +10,7 @@ import 'package:microlend/models/payment.dart';
 import 'package:microlend/models/schedule_installment.dart';
 import 'package:microlend/store/offline_store.dart';
 import 'package:microlend/store/app_state.dart';
+import 'package:microlend/utils/license_verifier.dart';
 import 'package:microlend/utils/loan_utils.dart';
 import 'package:microlend/utils/machine_id.dart';
 
@@ -589,6 +590,49 @@ void main() {
       final rolledOverLoan = appState.loans.firstWhere((l) => l.id == loan.id);
       expect(rolledOverLoan.termCount, 8);
       expect(rolledOverLoan.serviceFeeValue, 150.0);
+    });
+
+    test('activePublicKeyHex setting management, invalid rejection, and key verification', () async {
+      // 1. Default active key equals masterPublicKeyHex when unset
+      expect(appState.activePublicKeyHex, equals(LicenseVerifier.masterPublicKeyHex));
+
+      // 2. Reject invalid public key (not 64 hex characters)
+      expect(() => appState.setActivePublicKey('short_hex'), throwsArgumentError);
+      expect(() => appState.setActivePublicKey('zzzz' * 16), throwsArgumentError);
+      expect(appState.activePublicKeyHex, equals(LicenseVerifier.masterPublicKeyHex));
+
+      // 3. Generate custom keypair
+      final algorithm = Ed25519();
+      final customKeyPair = await algorithm.newKeyPair();
+      final customPubKey = await customKeyPair.extractPublicKey();
+      final customPubKeyHex = customPubKey.bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+
+      // Sign mock machine ID with custom keypair
+      MachineIdUtils.setMockMachineId('configurable_key_machine_999');
+      await appState.reload();
+
+      final customSig = await algorithm.sign(utf8.encode('configurable_key_machine_999'), keyPair: customKeyPair);
+      final customLicenseKey = base64.encode(customSig.bytes);
+
+      // Verification fails under master key
+      final unlockFail = await appState.unlockFeatures(customLicenseKey);
+      expect(unlockFail, isFalse);
+      expect(appState.isFeaturesUnlocked, isFalse);
+
+      // Update active public key via setActivePublicKey
+      await appState.setActivePublicKey(customPubKeyHex);
+      expect(appState.activePublicKeyHex, equals(customPubKeyHex));
+      expect(store.getSetting('activePublicKeyHex', ''), equals(customPubKeyHex));
+
+      // Verification succeeds now with active key
+      final unlockSuccess = await appState.unlockFeatures(customLicenseKey);
+      expect(unlockSuccess, isTrue);
+      expect(appState.isFeaturesUnlocked, isTrue);
+
+      // Reloading appState persists custom public key and re-verifies active license key
+      await appState.reload();
+      expect(appState.activePublicKeyHex, equals(customPubKeyHex));
+      expect(appState.isFeaturesUnlocked, isTrue);
     });
   });
 }
