@@ -90,11 +90,13 @@ class SettingsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Settings',
-                style: TextStyle(fontSize: isDesktop ? 20 : 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
+              if (!isDesktop) ...[
+                const Text(
+                  'Settings',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+              ],
 
               // Appearance Section
               CustomCard(

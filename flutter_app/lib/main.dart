@@ -503,6 +503,18 @@ class _MainShellState extends State<MainShell> {
       appBar: isDesktop
           ? null
           : AppBar(
+              leading: (_selectedLoanId != null || _selectedBorrowerId != null)
+                  ? IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      tooltip: 'Back',
+                      onPressed: () {
+                        setState(() {
+                          _selectedLoanId = null;
+                          _selectedBorrowerId = null;
+                        });
+                      },
+                    )
+                  : null,
               title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               actions: [
                 if (state.currentUser != null) ...[

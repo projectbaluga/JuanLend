@@ -7,6 +7,8 @@ import '../utils/loan_utils.dart';
 import '../widgets/app_badge.dart';
 import '../widgets/custom_card.dart';
 import '../widgets/responsive_container.dart';
+import '../widgets/screen_header.dart';
+import '../widgets/search_filter_bar.dart';
 
 class BorrowersScreen extends StatefulWidget {
   final Function(String) onSelectBorrower;
@@ -213,54 +215,32 @@ class _BorrowersScreenState extends State<BorrowersScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Text('Borrowers', style: TextStyle(fontSize: isDesktop ? 20 : 18, fontWeight: FontWeight.bold)),
-                    if (!state.isFeaturesUnlocked && borrowers.length >= 5) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '(Limit reached — unlock in Settings)',
-                        style: TextStyle(fontSize: isDesktop ? 12 : 11, color: Colors.amberAccent, fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ],
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => _showAddBorrowerDialog(context),
-                  icon: const Icon(Icons.person_add, size: 16),
-                  label: const Text('Add Borrower'),
-                ),
-              ],
+            ScreenHeader(
+              title: 'Borrowers',
+              titleSuffix: (!state.isFeaturesUnlocked && borrowers.length >= 5)
+                  ? Text(
+                      '(Limit reached — unlock in Settings)',
+                      style: TextStyle(fontSize: isDesktop ? 12 : 11, color: Colors.amberAccent, fontWeight: FontWeight.w500),
+                    )
+                  : null,
+              action: ElevatedButton.icon(
+                onPressed: () => _showAddBorrowerDialog(context),
+                icon: const Icon(Icons.person_add, size: 16),
+                label: const Text('Add Borrower'),
+              ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search by name, email, phone...',
-                      prefixIcon: Icon(Icons.search, size: 18),
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    onChanged: (val) => setState(() => _searchTerm = val),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButton<String>(
-                  value: _riskFilter,
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Risk')),
-                    DropdownMenuItem(value: 'low', child: Text('Low Risk')),
-                    DropdownMenuItem(value: 'medium', child: Text('Medium Risk')),
-                    DropdownMenuItem(value: 'high', child: Text('High Risk')),
-                  ],
-                  onChanged: (val) => setState(() => _riskFilter = val ?? 'all'),
-                ),
+            SearchFilterBar<String>(
+              hintText: 'Search by name, email, phone...',
+              onSearchChanged: (val) => setState(() => _searchTerm = val),
+              filterValue: _riskFilter,
+              filterItems: const [
+                DropdownMenuItem(value: 'all', child: Text('All Risk')),
+                DropdownMenuItem(value: 'low', child: Text('Low Risk')),
+                DropdownMenuItem(value: 'medium', child: Text('Medium Risk')),
+                DropdownMenuItem(value: 'high', child: Text('High Risk')),
               ],
+              onFilterChanged: (val) => setState(() => _riskFilter = val ?? 'all'),
             ),
             const SizedBox(height: 12),
             Expanded(

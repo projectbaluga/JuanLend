@@ -39,27 +39,33 @@ class BorrowerDetailScreen extends StatelessWidget {
         .where((l) => l.status == 'active' || l.status == 'defaulted')
         .fold(0.0, (sum, l) => sum + LoanUtils.getLoanStats(l).outstandingBalance);
 
+    final isDesktop = ResponsiveContainer.isDesktop(context);
+
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: onBack,
-        ),
-        title: Text(borrower.fullName),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add_card),
-            tooltip: 'Issue New Loan',
-            onPressed: () => onCreateLoanForBorrower(borrower.id),
-          ),
-        ],
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: ResponsiveContainer(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (!isDesktop)
+                    Text(
+                      borrower.fullName,
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    )
+                  else
+                    const SizedBox.shrink(),
+                  ElevatedButton.icon(
+                    onPressed: () => onCreateLoanForBorrower(borrower.id),
+                    icon: const Icon(Icons.add_card, size: 16),
+                    label: const Text('Issue New Loan'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               // Contact Info Card
             CustomCard(
               child: Column(
