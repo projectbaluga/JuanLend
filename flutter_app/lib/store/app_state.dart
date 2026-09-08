@@ -687,10 +687,22 @@ class AppState extends ChangeNotifier {
       await store.updateItem('loans', loanId, {'accrued_penalty': accruedPenaltyNow});
     }
 
+    final simulatedPayments = [...existingLoan.payments, payment];
+    final allocations = LoanUtils.allocatePayments(
+      existingLoan.schedule,
+      simulatedPayments,
+      penaltyAmount: accruedPenaltyNow,
+    );
+    final curAllocation = allocations[payment.id];
+
     final stampedPayment = payment.copyWith(
       recordedBy: payment.recordedBy.isNotEmpty ? payment.recordedBy : (_currentUser?.username ?? _currentUser?.id ?? 'System'),
       recordedByRole: payment.recordedByRole.isNotEmpty ? payment.recordedByRole : (_currentUser?.role ?? ''),
       recordedAt: payment.recordedAt.isNotEmpty ? payment.recordedAt : DateTime.now().toIso8601String(),
+      principalPortion: curAllocation?.principalPortion ?? payment.principalPortion,
+      interestPortion: curAllocation?.interestPortion ?? payment.interestPortion,
+      penaltyPortion: curAllocation?.penaltyPortion ?? payment.penaltyPortion,
+      excessAmount: curAllocation?.excessAmount ?? payment.excessAmount,
     );
 
     final updatedLoanMap = await store.appendToItemArray(

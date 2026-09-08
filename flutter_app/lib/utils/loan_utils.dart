@@ -4,6 +4,7 @@ import '../models/borrower.dart';
 import '../models/credit_assessment.dart';
 import '../models/loan.dart';
 import '../models/payment.dart';
+import '../models/payment_allocation.dart';
 import '../models/schedule_installment.dart';
 
 class LoanStats {
@@ -487,6 +488,100 @@ class LoanUtils {
     }
 
     return schedule;
+  }
+
+  static Map<String, PaymentAllocation> allocatePayments(
+    List<ScheduleInstallment> schedule,
+    List<Payment> payments, {
+    double penaltyAmount = 0.0,
+  }) {
+    final Map<String, PaymentAllocation> allocations = {};
+
+    // Clone schedule installment tracking
+    final List<Map<String, double>> instTrackers = schedule.map((inst) {
+      return {
+        'no': inst.installmentNo.toDouble(),
+        'amount': inst.amount,
+        'prinRemaining': inst.principal,
+        'intRemaining': inst.interest,
+        'totalRemaining': inst.amount,
+      };
+    }).toList();
+
+    double remainingPenaltyDue = penaltyAmount;
+
+    for (final payment in payments) {
+      double remainingPay = payment.amount;
+      double prinPaid = 0.0;
+      double intPaid = 0.0;
+      double penPaid = 0.0;
+      double excess = 0.0;
+      final List<int> coveredNos = [];
+
+      // 1. First satisfy accrued penalty if any
+      if (remainingPenaltyDue > kPaymentEpsilon && remainingPay > kPaymentEpsilon) {
+        final penApplicable = min(remainingPay, remainingPenaltyDue);
+        penPaid = round2(penApplicable);
+        remainingPenaltyDue = max(0.0, remainingPenaltyDue - penApplicable);
+        remainingPay = max(0.0, remainingPay - penApplicable);
+      }
+
+      // 2. Next satisfy schedule installments sequentially
+      for (final tracker in instTrackers) {
+        if (remainingPay <= kPaymentEpsilon) break;
+
+        final instRem = tracker['totalRemaining']!;
+        if (instRem <= kPaymentEpsilon) continue;
+
+        final instNo = tracker['no']!.toInt();
+        final payToInst = min(remainingPay, instRem);
+
+        if (!coveredNos.contains(instNo)) {
+          coveredNos.add(instNo);
+        }
+
+        // Split payToInst proportionally or interest-first / principal-first
+        final instTotalAmount = tracker['amount']!;
+        double instPrin = 0.0;
+        double instInt = 0.0;
+
+        if (instTotalAmount > kPaymentEpsilon) {
+          final intRem = tracker['intRemaining']!;
+          final prinRem = tracker['prinRemaining']!;
+
+          // Apply to interest first then principal
+          final intToPay = min(payToInst, intRem);
+          instInt = intToPay;
+          tracker['intRemaining'] = max(0.0, intRem - intToPay);
+
+          final prinToPay = min(payToInst - intToPay, prinRem);
+          instPrin = prinToPay;
+          tracker['prinRemaining'] = max(0.0, prinRem - prinToPay);
+        }
+
+        prinPaid += instPrin;
+        intPaid += instInt;
+        tracker['totalRemaining'] = max(0.0, tracker['totalRemaining']! - payToInst);
+        remainingPay = max(0.0, remainingPay - payToInst);
+      }
+
+      // 3. Any remaining payment is excess / overpayment
+      if (remainingPay > kPaymentEpsilon) {
+        excess = round2(remainingPay);
+      }
+
+      allocations[payment.id] = PaymentAllocation(
+        paymentId: payment.id,
+        totalAmount: payment.amount,
+        principalPortion: round2(prinPaid),
+        interestPortion: round2(intPaid),
+        penaltyPortion: round2(penPaid),
+        excessAmount: round2(excess),
+        coveredInstallmentNos: coveredNos,
+      );
+    }
+
+    return allocations;
   }
 
   static const double kPaymentEpsilon = 0.005;
