@@ -1,6 +1,10 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:pointycastle/digests/sha256.dart';
+import 'package:pointycastle/key_derivators/api.dart';
+import 'package:pointycastle/key_derivators/pbkdf2.dart';
+import 'package:pointycastle/macs/hmac.dart';
 
 class User {
   final String id;
@@ -19,9 +23,15 @@ class User {
     this.mustChangePassword = false,
   });
 
-  static String hashPassword(String password, String salt) {
-    final bytes = utf8.encode('$salt:$password');
-    return sha256.convert(bytes).toString();
+  static const int kPbkdf2Iterations = 100000;
+  static const String kAlgoPrefix = 'pbkdf2_sha256\$100000\$';
+
+  static String hashPassword(String password, String salt, {int iterations = kPbkdf2Iterations}) {
+    final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
+    derivator.init(Pbkdf2Parameters(utf8.encode(salt), iterations, 32));
+    final keyBytes = derivator.process(utf8.encode(password));
+    final hashBase64 = base64Url.encode(keyBytes);
+    return 'pbkdf2_sha256\$$iterations\$$hashBase64';
   }
 
   static String generateSalt([int length = 16]) {
@@ -31,7 +41,19 @@ class User {
   }
 
   bool verifyPassword(String password) {
-    return passwordHash == hashPassword(password, salt);
+    if (passwordHash.startsWith('pbkdf2_sha256\$')) {
+      final parts = passwordHash.split('\$');
+      if (parts.length == 3) {
+        final iterations = int.tryParse(parts[1]) ?? kPbkdf2Iterations;
+        final computed = hashPassword(password, salt, iterations: iterations);
+        return computed == passwordHash;
+      }
+    }
+
+    // Legacy single-pass SHA-256 fallback
+    final bytes = utf8.encode('$salt:$password');
+    final legacyHash = sha256.convert(bytes).toString();
+    return passwordHash == legacyHash;
   }
 
   factory User.fromMap(Map<String, dynamic> map) {

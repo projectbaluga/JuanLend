@@ -74,7 +74,15 @@ Lending 3,000 at 12%, monthly. Total profit = interest + upfront fee.
 | Interest-Only | 6 months | 150 | 2,850 | 3,180 | 330 |
 | One-Time | any term | 150 | 2,850 | 3,360 | 510 |
 
-## Part 10 — Recommendations for a Non-Techy Lender
+## Part 10 — Licensing and Unlocking Full Features
+MicroLend operates in an Unlicensed edition by default, which supports up to 5 borrowers.
+To unlock full features and unlimited borrowers:
+1. Go to **Settings** in the main menu.
+2. Locate the **Full Features** card.
+3. Enter the master unlock code (`MICROLEND-FULL-UNLOCK`) into the unlock input field.
+4. Click **Unlock**. Once unlocked, full functionality and unlimited borrower creation will be permanently enabled on your instance unless re-locked manually.
+
+## Part 11 — Recommendations for a Non-Techy Lender
 - For traditional "5-6" lending, choose Flat / Add-on — most predictable and familiar.
 - Add an Upfront Deduction to collect part of your profit immediately.
 - Use Penalty to protect against late payers.

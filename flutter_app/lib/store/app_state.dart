@@ -1,5 +1,13 @@
 import 'dart:convert';
+import 'dart:math';
+import 'dart:typed_data';
+import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/material.dart';
+import 'package:pointycastle/api.dart';
+import 'package:pointycastle/digests/sha256.dart';
+import 'package:pointycastle/key_derivators/api.dart';
+import 'package:pointycastle/key_derivators/pbkdf2.dart';
+import 'package:pointycastle/macs/hmac.dart';
 import '../models/borrower.dart';
 import '../models/loan.dart';
 import '../models/payment.dart';
@@ -119,6 +127,13 @@ class AppState extends ChangeNotifier {
     if (user.verifyPassword(password.trim())) {
       _currentUser = user;
       await store.setSetting('session_user_id', user.id);
+
+      if (!user.passwordHash.startsWith('pbkdf2_sha256\$')) {
+        final newHash = User.hashPassword(password.trim(), user.salt);
+        await store.updateItem('users', user.id, {'password_hash': newHash});
+        _currentUser = user.copyWith(passwordHash: newHash);
+      }
+
       notifyListeners();
       return true;
     }
@@ -347,33 +362,145 @@ class AppState extends ChangeNotifier {
         .toList();
   }
 
-  String exportDataJson() {
-    final data = {
+  static const String _backupHmacSecret = 'microlend_backup_integrity_key_v1';
+
+  String exportDataJson({String? passphrase}) {
+    final payloadMap = {
       'borrowers': store.getCollection('borrowers'),
       'loans': store.getCollection('loans'),
       'exportedAt': DateTime.now().toIso8601String(),
     };
-    return const JsonEncoder.withIndent('  ').convert(data);
+    final payloadJson = jsonEncode(payloadMap);
+
+    if (passphrase != null && passphrase.trim().isNotEmpty) {
+      final saltBytes = List<int>.generate(16, (_) => Random.secure().nextInt(256));
+      final saltBase64 = base64Url.encode(saltBytes);
+
+      final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
+      derivator.init(Pbkdf2Parameters(utf8.encode(saltBase64), 100000, 32));
+      final keyBytes = derivator.process(utf8.encode(passphrase.trim()));
+
+      final iv = enc.IV.fromSecureRandom(12);
+      final encrypter = enc.Encrypter(enc.AES(enc.Key(Uint8List.fromList(keyBytes)), mode: enc.AESMode.gcm));
+      final encrypted = encrypter.encrypt(payloadJson, iv: iv);
+
+      final envelope = {
+        'version': 1,
+        'encrypted': true,
+        'kdf': 'pbkdf2_sha256',
+        'iterations': 100000,
+        'salt': saltBase64,
+        'iv': iv.base64,
+        'ciphertext': encrypted.base64,
+        'exportedAt': DateTime.now().toIso8601String(),
+      };
+      return const JsonEncoder.withIndent('  ').convert(envelope);
+    } else {
+      final hmac = HMac(SHA256Digest(), 64);
+      hmac.init(KeyParameter(utf8.encode(_backupHmacSecret)));
+      final macBytes = hmac.process(utf8.encode(payloadJson));
+      final signature = base64Url.encode(macBytes);
+
+      final envelope = {
+        'version': 1,
+        'encrypted': false,
+        'payload': payloadMap,
+        'signature': signature,
+        'exportedAt': DateTime.now().toIso8601String(),
+      };
+      return const JsonEncoder.withIndent('  ').convert(envelope);
+    }
   }
 
-  Future<void> importDataJson(String jsonStr) async {
-    final decoded = jsonDecode(jsonStr);
-    if (decoded is! Map<String, dynamic> ||
-        !decoded.containsKey('borrowers') ||
-        !decoded.containsKey('loans') ||
-        decoded['borrowers'] is! List ||
-        decoded['loans'] is! List) {
+  Future<void> importDataJson(String jsonStr, {String? passphrase}) async {
+    final Map<String, dynamic> decoded;
+    try {
+      final rawDecoded = jsonDecode(jsonStr);
+      if (rawDecoded is! Map<String, dynamic>) {
+        throw const FormatException('Invalid backup file format: root object is not a JSON map.');
+      }
+      decoded = rawDecoded;
+    } catch (e) {
+      if (e is FormatException) rethrow;
+      throw const FormatException('Invalid backup file format: failed to parse JSON.');
+    }
+
+    Map<String, dynamic> payload;
+
+    if (decoded['encrypted'] == true) {
+      if (passphrase == null || passphrase.trim().isEmpty) {
+        throw const FormatException('Backup file is encrypted. Please provide a passphrase to decrypt and restore.');
+      }
+      final saltBase64 = decoded['salt']?.toString() ?? '';
+      final ivBase64 = decoded['iv']?.toString() ?? '';
+      final ciphertextBase64 = decoded['ciphertext']?.toString() ?? '';
+      final iterations = decoded['iterations'] is int ? decoded['iterations'] as int : 100000;
+
+      if (saltBase64.isEmpty || ivBase64.isEmpty || ciphertextBase64.isEmpty) {
+        throw const FormatException('Corrupted encrypted backup file: missing encryption parameters.');
+      }
+
+      try {
+        final derivator = PBKDF2KeyDerivator(HMac(SHA256Digest(), 64));
+        derivator.init(Pbkdf2Parameters(utf8.encode(saltBase64), iterations, 32));
+        final keyBytes = derivator.process(utf8.encode(passphrase.trim()));
+
+        final iv = enc.IV.fromBase64(ivBase64);
+        final encrypted = enc.Encrypted.fromBase64(ciphertextBase64);
+        final encrypter = enc.Encrypter(enc.AES(enc.Key(Uint8List.fromList(keyBytes)), mode: enc.AESMode.gcm));
+        final decryptedText = encrypter.decrypt(encrypted, iv: iv);
+
+        final rawPayload = jsonDecode(decryptedText);
+        if (rawPayload is! Map<String, dynamic>) {
+          throw const FormatException('Decrypted payload is invalid.');
+        }
+        payload = rawPayload;
+      } catch (e) {
+        if (e is FormatException) rethrow;
+        throw const FormatException('Failed to decrypt backup: incorrect passphrase or corrupted backup file.');
+      }
+    } else if (decoded.containsKey('payload') && decoded['encrypted'] == false) {
+      final rawPayload = decoded['payload'];
+      if (rawPayload is! Map<String, dynamic>) {
+        throw const FormatException('Invalid backup payload.');
+      }
+      payload = rawPayload;
+
+      if (decoded.containsKey('signature')) {
+        final payloadJson = jsonEncode(payload);
+        final hmac = HMac(SHA256Digest(), 64);
+        hmac.init(KeyParameter(utf8.encode(_backupHmacSecret)));
+        final macBytes = hmac.process(utf8.encode(payloadJson));
+        final expectedSignature = base64Url.encode(macBytes);
+        final signature = decoded['signature']?.toString() ?? '';
+
+        if (signature != expectedSignature) {
+          throw const FormatException('Backup integrity check failed: file has been tampered with or corrupted.');
+        }
+      }
+    } else if (decoded.containsKey('borrowers') && decoded.containsKey('loans')) {
+      payload = decoded;
+    } else {
       throw const FormatException('Invalid backup file format: missing borrowers or loans data.');
     }
 
-    final List borrowersList = decoded['borrowers'];
-    final List loansList = decoded['loans'];
+    if (!payload.containsKey('borrowers') ||
+        !payload.containsKey('loans') ||
+        payload['borrowers'] is! List ||
+        payload['loans'] is! List) {
+      throw const FormatException('Invalid backup payload: missing borrowers or loans lists.');
+    }
 
-    final borrowers = borrowersList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-    final loans = loansList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final List borrowersList = payload['borrowers'];
+    final List loansList = payload['loans'];
 
-    await store.saveCollection('borrowers', borrowers);
-    await store.saveCollection('loans', loans);
+    final List<Map<String, dynamic>> borrowersMaps =
+        borrowersList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    final List<Map<String, dynamic>> loansMaps =
+        loansList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
+    await store.saveCollection('borrowers', borrowersMaps);
+    await store.saveCollection('loans', loansMaps);
     notifyListeners();
   }
 

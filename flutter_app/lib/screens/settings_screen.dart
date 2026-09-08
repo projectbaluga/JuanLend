@@ -7,8 +7,159 @@ import '../store/backup_service.dart';
 import '../widgets/custom_card.dart';
 import '../widgets/responsive_container.dart';
 
+enum _BackupAction { saveFile, share, viewJson }
+
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  void _promptExportPassphrase(BuildContext context, AppState state, {required _BackupAction action}) {
+    final passCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          title: const Text('Export Backup Encryption'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Optional: Enter a passphrase to encrypt this backup with AES-GCM (PBKDF2). Leave blank to export with HMAC integrity signature.',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passCtrl,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Encryption Passphrase (Optional)',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final pass = passCtrl.text.trim();
+                Navigator.pop(dialogCtx);
+                final jsonStr = state.exportDataJson(passphrase: pass.isNotEmpty ? pass : null);
+
+                switch (action) {
+                  case _BackupAction.saveFile:
+                    try {
+                      final filePath = await BackupService.saveBackupToFile(jsonStr);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Backup saved to $filePath')),
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to save backup file: $e')),
+                      );
+                    }
+                    break;
+                  case _BackupAction.share:
+                    try {
+                      await BackupService.shareBackup(jsonStr);
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to share backup: $e')),
+                      );
+                    }
+                    break;
+                  case _BackupAction.viewJson:
+                    _showExportDialog(context, jsonStr);
+                    break;
+                }
+              },
+              child: const Text('Continue Export'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _handleRestoreContent(BuildContext context, AppState state, String content) {
+    if (content.contains('"encrypted": true')) {
+      final passCtrl = TextEditingController();
+      showDialog(
+        context: context,
+        builder: (dialogCtx) {
+          return AlertDialog(
+            title: const Text('Encrypted Backup Detected'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'This backup file is encrypted. Please enter the passphrase used during export to decrypt and restore data.',
+                  style: TextStyle(fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: passCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Decryption Passphrase',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final pass = passCtrl.text.trim();
+                  Navigator.pop(dialogCtx);
+                  _executeRestore(context, state, content, passphrase: pass);
+                },
+                child: const Text('Decrypt & Restore'),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      _showConfirmDialog(
+        context: context,
+        title: 'Restore Backup from File?',
+        message: 'This action will overwrite your current local borrowers and loans data with the selected file.',
+        onConfirm: () => _executeRestore(context, state, content),
+      );
+    }
+  }
+
+  void _executeRestore(BuildContext context, AppState state, String content, {String? passphrase}) async {
+    try {
+      await state.importDataJson(content, passphrase: passphrase);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Data successfully restored from backup file!')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to restore data: ${e is FormatException ? e.message : e.toString()}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
 
   void _showExportDialog(BuildContext context, String jsonStr) {
     showDialog(
@@ -277,72 +428,29 @@ class SettingsScreen extends StatelessWidget {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Back up to File', style: TextStyle(fontSize: 13)),
-                      subtitle: const Text('Save backup JSON to local documents directory', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      subtitle: const Text('Save backup JSON (with optional encryption passphrase)', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.save_alt, size: 18),
-                      onTap: () async {
-                        final jsonStr = state.exportDataJson();
-                        try {
-                          final filePath = await BackupService.saveBackupToFile(jsonStr);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Backup saved to $filePath')),
-                          );
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to save backup file: $e')),
-                          );
-                        }
-                      },
+                      onTap: () => _promptExportPassphrase(context, state, action: _BackupAction.saveFile),
                     ),
                     const Divider(height: 16),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Share Backup', style: TextStyle(fontSize: 13)),
-                      subtitle: const Text('Export JSON file to Google Drive, Gmail, or other apps', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      subtitle: const Text('Export encrypted or signed JSON file to other apps', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.share, size: 18),
-                      onTap: () async {
-                        final jsonStr = state.exportDataJson();
-                        try {
-                          await BackupService.shareBackup(jsonStr);
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to share backup: $e')),
-                          );
-                        }
-                      },
+                      onTap: () => _promptExportPassphrase(context, state, action: _BackupAction.share),
                     ),
                     const Divider(height: 16),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Restore from File', style: TextStyle(fontSize: 13)),
-                      subtitle: const Text('Pick and import backup JSON file', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      subtitle: const Text('Pick and import backup file with integrity & decryption checks', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.upload_file, size: 18),
                       onTap: () async {
                         try {
                           final content = await BackupService.pickAndReadBackup();
-                          if (content == null) return;
-                          if (!context.mounted) return;
-                          _showConfirmDialog(
-                            context: context,
-                            title: 'Restore Backup from File?',
-                            message: 'This action will overwrite your current local borrowers and loans data with the selected file.',
-                            onConfirm: () async {
-                              try {
-                                await state.importDataJson(content);
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Data successfully restored from backup file!')),
-                                );
-                              } catch (e) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to restore data: $e')),
-                                );
-                              }
-                            },
-                          );
+                          if (content == null || !context.mounted) return;
+                          _handleRestoreContent(context, state, content);
                         } catch (e) {
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -357,10 +465,7 @@ class SettingsScreen extends StatelessWidget {
                       title: const Text('Export Data (JSON)', style: TextStyle(fontSize: 13)),
                       subtitle: const Text('Export borrowers and loans to JSON string', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.download, size: 18),
-                      onTap: () {
-                        final jsonStr = state.exportDataJson();
-                        _showExportDialog(context, jsonStr);
-                      },
+                      onTap: () => _promptExportPassphrase(context, state, action: _BackupAction.viewJson),
                     ),
                     const Divider(height: 16),
                     ListTile(
