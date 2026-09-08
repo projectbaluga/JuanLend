@@ -523,11 +523,15 @@ class SettingsScreen extends StatelessWidget {
                       );
                     }
 
-                    final rawVer = snapshot.data?.version ?? '';
-                    final ver = rawVer.trim().isEmpty ? '1.0.0' : rawVer.trim();
+                    final pkgVer = snapshot.data?.version.trim() ?? '';
+                    final ver = state.appVersion.isNotEmpty
+                        ? state.appVersion
+                        : (pkgVer.isNotEmpty ? pkgVer : '1.0.0');
 
-                    final rawBuild = snapshot.data?.buildNumber ?? '';
-                    final build = rawBuild.trim().isEmpty ? '1' : rawBuild.trim();
+                    final pkgBuild = snapshot.data?.buildNumber.trim() ?? '';
+                    final build = state.appBuild.isNotEmpty
+                        ? state.appBuild
+                        : (pkgBuild.isNotEmpty ? pkgBuild : '1');
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

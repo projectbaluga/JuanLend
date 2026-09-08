@@ -172,10 +172,10 @@ jobs:
         run: flutter test
 
       - name: Build Android APK (Release)
-        run: flutter build apk --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
+        run: flutter build apk --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --dart-define=APP_VERSION="${{ needs.version.outputs.version_name }}" --dart-define=APP_BUILD="${{ needs.version.outputs.build_number }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
 
       - name: Build Android App Bundle (AAB Release)
-        run: flutter build appbundle --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
+        run: flutter build appbundle --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --dart-define=APP_VERSION="${{ needs.version.outputs.version_name }}" --dart-define=APP_BUILD="${{ needs.version.outputs.build_number }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
@@ -219,7 +219,7 @@ jobs:
         run: bash tool/apply_branding.sh
 
       - name: Build iOS App (Release, Unsigned)
-        run: flutter build ios --release --no-codesign --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
+        run: flutter build ios --release --no-codesign --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --dart-define=APP_VERSION="${{ needs.version.outputs.version_name }}" --dart-define=APP_BUILD="${{ needs.version.outputs.build_number }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
 
       - name: Upload Unsigned iOS Build Artifact
         uses: actions/upload-artifact@v4
@@ -257,7 +257,7 @@ jobs:
         run: bash tool/apply_branding.sh
 
       - name: Build macOS App (Release)
-        run: flutter build macos --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
+        run: flutter build macos --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --dart-define=APP_VERSION="${{ needs.version.outputs.version_name }}" --dart-define=APP_BUILD="${{ needs.version.outputs.build_number }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
 
       - name: Upload macOS Desktop Artifact
         uses: actions/upload-artifact@v4
@@ -301,7 +301,7 @@ jobs:
         run: flutter test
 
       - name: Build Windows Executable (Release)
-        run: flutter build windows --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
+        run: flutter build windows --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --dart-define=APP_VERSION="${{ needs.version.outputs.version_name }}" --dart-define=APP_BUILD="${{ needs.version.outputs.build_number }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
 
       - name: Compile Windows Installer (Inno Setup)
         shell: powershell

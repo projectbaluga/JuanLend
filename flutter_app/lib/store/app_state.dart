@@ -29,6 +29,8 @@ class AppState extends ChangeNotifier {
 
   static const String _envAppName = String.fromEnvironment('APP_NAME', defaultValue: '');
   static const String _envAppDescription = String.fromEnvironment('APP_DESCRIPTION', defaultValue: '');
+  static const String _envAppVersion = String.fromEnvironment('APP_VERSION', defaultValue: '');
+  static const String _envAppBuild = String.fromEnvironment('APP_BUILD', defaultValue: '');
 
   static const int _borrowerLimit = 5;
 
@@ -155,6 +157,8 @@ class AppState extends ChangeNotifier {
     return 'Local-first micro-lending management software designed for solo operators. '
         'Includes automated amortization scheduling, borrower credit risk scoring, payment tracking, and offline data persistence.';
   }
+  String get appVersion => _envAppVersion.trim();
+  String get appBuild => _envAppBuild.trim();
   String get currencyCode => _currencyCode;
   String get dateFormat => _dateFormat;
   String get businessName => _businessName;
