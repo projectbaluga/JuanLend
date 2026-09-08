@@ -508,8 +508,26 @@ class SettingsScreen extends StatelessWidget {
                 child: FutureBuilder<PackageInfo>(
                   future: PackageInfo.fromPlatform(),
                   builder: (context, snapshot) {
-                    final ver = snapshot.data?.version ?? '1.0.0';
-                    final build = snapshot.data?.buildNumber ?? '1';
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('About ${state.appName}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          const SizedBox(
+                            height: 14,
+                            width: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ],
+                      );
+                    }
+
+                    final rawVer = snapshot.data?.version ?? '';
+                    final ver = rawVer.trim().isEmpty ? '1.0.0' : rawVer.trim();
+
+                    final rawBuild = snapshot.data?.buildNumber ?? '';
+                    final build = rawBuild.trim().isEmpty ? '1' : rawBuild.trim();
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
