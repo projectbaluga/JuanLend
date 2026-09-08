@@ -230,6 +230,13 @@ class LoanDetailScreen extends StatelessWidget {
 
                                 final updatedLoan = state.loans.firstWhere((l) => l.id == loan.id, orElse: () => loan);
                                 final updatedStats = LoanUtils.getLoanStats(updatedLoan);
+                                final allocations = LoanUtils.allocatePayments(
+                                  updatedLoan.schedule,
+                                  updatedLoan.payments,
+                                  penaltyAmount: updatedStats.penaltyAmount,
+                                );
+                                final curAlloc = allocations[payment.id];
+
                                 final receiptText = ReceiptUtils.generatePaymentReceipt(
                                   businessName: state.businessName,
                                   borrower: borrower,
@@ -237,6 +244,7 @@ class LoanDetailScreen extends StatelessWidget {
                                   payment: payment,
                                   runningOutstandingBalance: updatedStats.outstandingBalance,
                                   currencyCode: state.currencyCode,
+                                  allocation: curAlloc,
                                 );
 
                                 if (!context.mounted) return;
@@ -844,45 +852,129 @@ class LoanDetailScreen extends StatelessWidget {
                   if (loan.payments.isEmpty)
                     const Text('No payments recorded yet.', style: TextStyle(fontSize: 11, color: Colors.grey))
                   else
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: loan.payments.length,
-                      separatorBuilder: (_, __) => const Divider(height: 12),
-                      itemBuilder: (context, idx) {
-                        final p = loan.payments[idx];
-                        final recBy = p.recordedBy.isNotEmpty
-                            ? (p.recordedByRole.isNotEmpty ? '${p.recordedBy} (${p.recordedByRole})' : p.recordedBy)
-                            : '';
+                    Builder(
+                      builder: (context) {
+                        final allocations = LoanUtils.allocatePayments(
+                          loan.schedule,
+                          loan.payments,
+                          penaltyAmount: stats.penaltyAmount,
+                        );
 
-                        return Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(LoanUtils.formatCurrency(p.amount, state.currencyCode),
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
-                                Text('via ${p.method}${p.note.isNotEmpty ? ' • ${p.note}' : ''}',
-                                    style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                                if (recBy.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text('Recorded by $recBy', style: const TextStyle(fontSize: 9, color: Colors.grey)),
-                                ],
-                              ],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(LoanUtils.formatDate(p.date), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                                if (p.recordedAt.isNotEmpty)
-                                  Text(
-                                    p.recordedAt.length >= 10 ? p.recordedAt.substring(0, 10) : p.recordedAt,
-                                    style: const TextStyle(fontSize: 9, color: Colors.grey),
+                        return ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: loan.payments.length,
+                          separatorBuilder: (_, __) => const Divider(height: 12),
+                          itemBuilder: (context, idx) {
+                            final p = loan.payments[idx];
+                            final alloc = allocations[p.id];
+
+                            final recBy = p.recordedBy.isNotEmpty
+                                ? (p.recordedByRole.isNotEmpty ? '${p.recordedBy} (${p.recordedByRole})' : p.recordedBy)
+                                : '';
+
+                            final coveredText = alloc != null && alloc.coveredInstallmentNos.isNotEmpty
+                                ? 'Applied to installments: ${alloc.coveredInstallmentsRange}'
+                                : '';
+
+                            final principalVal = alloc?.principalPortion ?? p.principalPortion;
+                            final interestVal = alloc?.interestPortion ?? p.interestPortion;
+                            final penaltyVal = alloc?.penaltyPortion ?? p.penaltyPortion;
+                            final excessVal = alloc?.excessAmount ?? p.excessAmount;
+
+                            return Theme(
+                              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                              child: ExpansionTile(
+                                tilePadding: EdgeInsets.zero,
+                                childrenPadding: const EdgeInsets.only(bottom: 8.0, top: 4.0),
+                                title: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(LoanUtils.formatCurrency(p.amount, state.currencyCode),
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                        Text('via ${p.method}${p.note.isNotEmpty ? ' • ${p.note}' : ''}',
+                                            style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                        if (coveredText.isNotEmpty) ...[
+                                          const SizedBox(height: 2),
+                                          Text(coveredText, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: Color(0xFF0284C7))),
+                                        ],
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(LoanUtils.formatDate(p.date), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                        if (recBy.isNotEmpty)
+                                          Text('By $recBy', style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8.0),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).brightness == Brightness.dark
+                                          ? const Color(0xFF27272A)
+                                          : Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Principal Portion:', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                            Text(LoanUtils.formatCurrency(principalVal, state.currencyCode),
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text('Interest Portion:', style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                                            Text(LoanUtils.formatCurrency(interestVal, state.currencyCode),
+                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                          ],
+                                        ),
+                                        if (penaltyVal > 0) ...[
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text('Penalty Paid:', style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
+                                              Text(LoanUtils.formatCurrency(penaltyVal, state.currencyCode),
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                                            ],
+                                          ),
+                                        ],
+                                        if (excessVal > 0) ...[
+                                          const SizedBox(height: 2),
+                                          Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text('Excess / Overpayment:', style: const TextStyle(fontSize: 11, color: Color(0xFF059669))),
+                                              Text(LoanUtils.formatCurrency(excessVal, state.currencyCode),
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
+                                            ],
+                                          ),
+                                        ],
+                                        if (p.recordedAt.isNotEmpty) ...[
+                                          const Divider(height: 10),
+                                          Text('Recorded At: ${p.recordedAt}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                        ],
+                                      ],
+                                    ),
                                   ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            );
+                          },
                         );
                       },
                     ),

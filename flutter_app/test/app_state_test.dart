@@ -537,6 +537,28 @@ void main() {
       expect(stats.creditBalance, 50.0);
     });
 
+    test('allocatePayments correctly calculates principal, interest, penalty, excess, and covered installments for lump-sum payment', () {
+      final schedule = LoanUtils.generateSchedule(5000.0, 10.0, 5, '2026-01-01');
+      final totalScheduled = schedule.fold(0.0, (sum, s) => sum + s.amount);
+
+      final lumpSumPayment = Payment(
+        id: 'p_lumpsum_1',
+        date: '2026-01-15',
+        amount: totalScheduled + 100.10, // covers all 5 installments + 100.10 excess
+        method: 'Bank Transfer',
+        note: 'Lump Sum Settlement',
+      );
+
+      final allocations = LoanUtils.allocatePayments(schedule, [lumpSumPayment]);
+      final alloc = allocations['p_lumpsum_1']!;
+
+      expect(alloc.totalAmount, totalScheduled + 100.10);
+      expect(alloc.coveredInstallmentNos, [1, 2, 3, 4, 5]);
+      expect(alloc.coveredInstallmentsRange, '#1–#5');
+      expect(alloc.excessAmount, 100.10);
+      expect(alloc.principalPortion, 5000.0);
+    });
+
     test('allPayments getter flattens, joins borrowers, sorts descending, and handles legacy payments', () async {
       await appState.createUser('officer_log', 'officer123', 'officer');
       await appState.login('officer_log', 'officer123');

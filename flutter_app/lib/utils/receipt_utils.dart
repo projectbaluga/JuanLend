@@ -1,6 +1,7 @@
 import '../models/borrower.dart';
 import '../models/loan.dart';
 import '../models/payment.dart';
+import '../models/payment_allocation.dart';
 import 'loan_utils.dart';
 
 class ReceiptUtils {
@@ -11,6 +12,7 @@ class ReceiptUtils {
     required Payment payment,
     required double runningOutstandingBalance,
     String? currencyCode,
+    PaymentAllocation? allocation,
   }) {
     final cur = currencyCode ?? LoanUtils.defaultCurrencyCode;
     final buffer = StringBuffer();
@@ -31,6 +33,34 @@ class ReceiptUtils {
     if (payment.note.isNotEmpty) {
       buffer.writeln('Note: ${payment.note}');
     }
+
+    if (allocation != null) {
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('PAYMENT ALLOCATION BREAKDOWN:');
+      if (allocation.coveredInstallmentNos.isNotEmpty) {
+        buffer.writeln('Covered Installments: ${allocation.coveredInstallmentsRange}');
+      }
+      buffer.writeln('Principal Portion: ${LoanUtils.formatCurrency(allocation.principalPortion, cur)}');
+      buffer.writeln('Interest Portion:  ${LoanUtils.formatCurrency(allocation.interestPortion, cur)}');
+      if (allocation.penaltyPortion > 0) {
+        buffer.writeln('Penalty Portion:   ${LoanUtils.formatCurrency(allocation.penaltyPortion, cur)}');
+      }
+      if (allocation.excessAmount > 0) {
+        buffer.writeln('Excess / Overpayment: ${LoanUtils.formatCurrency(allocation.excessAmount, cur)}');
+      }
+    } else if (payment.principalPortion > 0 || payment.interestPortion > 0 || payment.excessAmount > 0) {
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('PAYMENT ALLOCATION BREAKDOWN:');
+      buffer.writeln('Principal Portion: ${LoanUtils.formatCurrency(payment.principalPortion, cur)}');
+      buffer.writeln('Interest Portion:  ${LoanUtils.formatCurrency(payment.interestPortion, cur)}');
+      if (payment.penaltyPortion > 0) {
+        buffer.writeln('Penalty Portion:   ${LoanUtils.formatCurrency(payment.penaltyPortion, cur)}');
+      }
+      if (payment.excessAmount > 0) {
+        buffer.writeln('Excess / Overpayment: ${LoanUtils.formatCurrency(payment.excessAmount, cur)}');
+      }
+    }
+
     buffer.writeln('----------------------------------------');
     buffer.writeln('Remaining Balance: ${LoanUtils.formatCurrency(runningOutstandingBalance, cur)}');
     buffer.writeln('========================================');
@@ -92,6 +122,9 @@ class ReceiptUtils {
       buffer.writeln('TOTAL DUE WITH PENALTY: ${LoanUtils.formatCurrency(stats.totalDueWithPenalty, cur)}');
     } else {
       buffer.writeln('TOTAL DUE:           ${LoanUtils.formatCurrency(stats.outstandingBalance, cur)}');
+    }
+    if (stats.creditBalance > 0) {
+      buffer.writeln('Credit Balance / Overpayment: ${LoanUtils.formatCurrency(stats.creditBalance, cur)}');
     }
     buffer.writeln('========================================');
 
