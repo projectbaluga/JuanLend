@@ -56,7 +56,7 @@ class AppState extends ChangeNotifier {
   void _loadSyncSettings() {
     _currencyCode = store.getSetting('currencyCode', 'PHP');
     _dateFormat = store.getSetting('dateFormat', 'MMM d, yyyy');
-    final defaultBusinessName = _envAppName.trim().isNotEmpty ? _envAppName.trim() : 'MicroLend Suite';
+    final defaultBusinessName = _envAppName.trim().isNotEmpty ? _envAppName.trim() : 'JuanLend';
     _businessName = store.getSetting('businessName', defaultBusinessName);
     final termStr = store.getSetting('defaultTermPeriods', store.getSetting('defaultTermMonths', '6'));
     _defaultTermPeriods = int.tryParse(termStr) ?? 6;

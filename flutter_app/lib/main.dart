@@ -25,8 +25,8 @@ void main() async {
   );
 }
 
-const String _envAppName = String.fromEnvironment('APP_NAME', defaultValue: 'MicroLend');
-final String appTitle = _envAppName.trim().isEmpty ? 'MicroLend' : _envAppName;
+const String _envAppName = String.fromEnvironment('APP_NAME', defaultValue: 'JuanLend');
+final String appTitle = _envAppName.trim().isEmpty ? 'JuanLend' : _envAppName;
 
 class MicroLendApp extends StatelessWidget {
   const MicroLendApp({super.key});
