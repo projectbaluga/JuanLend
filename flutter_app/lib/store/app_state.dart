@@ -38,12 +38,6 @@ class AppState extends ChangeNotifier {
   late ThemeMode _themeMode;
   bool _featuresUnlocked = false;
   String _machineId = '';
-  late String _activePublicKeyHex;
-
-  bool _isValidHex64(String str) {
-    final clean = str.trim();
-    return clean.length == 64 && RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(clean);
-  }
 
   AppState(this.store) {
     _loadSyncSettings();
@@ -69,8 +63,8 @@ class AppState extends ChangeNotifier {
     final savedTheme = store.getSetting('themeMode', 'dark');
     _themeMode = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
 
-    final storedKey = store.getSetting('activePublicKeyHex', LicenseVerifier.masterPublicKeyHex);
-    _activePublicKeyHex = _isValidHex64(storedKey) ? storedKey.trim() : LicenseVerifier.masterPublicKeyHex;
+    final storedLicenseKey = store.getSetting('licenseKey', '');
+    _featuresUnlocked = LicenseVerifier.verifyUnlockCode(storedLicenseKey);
 
     final sessionUserId = store.getSetting('session_user_id', '');
     if (sessionUserId.isNotEmpty) {
@@ -99,37 +93,8 @@ class AppState extends ChangeNotifier {
 
   Future<void> _loadSettings() async {
     _loadSyncSettings();
-    _currencyCode = store.getSetting('currencyCode', 'PHP');
-    _dateFormat = store.getSetting('dateFormat', 'MMM d, yyyy');
-    final defaultBusinessName = _envAppName.trim().isNotEmpty ? _envAppName.trim() : 'MicroLend Suite';
-    _businessName = store.getSetting('businessName', defaultBusinessName);
-    final termStr = store.getSetting('defaultTermPeriods', store.getSetting('defaultTermMonths', '6'));
-    _defaultTermPeriods = int.tryParse(termStr) ?? 6;
-    _defaultInterestRate = double.tryParse(store.getSetting('defaultInterestRate', '12.0')) ?? 12.0;
-    _defaultRepaymentFrequency = store.getSetting('defaultRepaymentFrequency', 'monthly');
-    _defaultInterestMethod = store.getSetting('defaultInterestMethod', 'reducing');
-    _defaultPenaltyType = store.getSetting('defaultPenaltyType', 'none');
-    _defaultPenaltyValue = double.tryParse(store.getSetting('defaultPenaltyValue', '0.0')) ?? 0.0;
-
-    LoanUtils.defaultCurrencyCode = _currencyCode;
-    LoanUtils.defaultDateFormat = _dateFormat;
-
-    final savedTheme = store.getSetting('themeMode', 'dark');
-    _themeMode = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
-
-    final storedKey = store.getSetting('activePublicKeyHex', LicenseVerifier.masterPublicKeyHex);
-    _activePublicKeyHex = _isValidHex64(storedKey) ? storedKey.trim() : LicenseVerifier.masterPublicKeyHex;
-
     final storedLicenseKey = store.getSetting('licenseKey', '');
-    if (storedLicenseKey.isNotEmpty && _machineId.isNotEmpty) {
-      _featuresUnlocked = await LicenseVerifier.verifyLicenseKey(
-        storedLicenseKey,
-        _machineId,
-        overridePublicKeyHex: _activePublicKeyHex,
-      );
-    } else {
-      _featuresUnlocked = false;
-    }
+    _featuresUnlocked = LicenseVerifier.verifyUnlockCode(storedLicenseKey);
 
     final sessionUserId = store.getSetting('session_user_id', '');
     if (sessionUserId.isNotEmpty) {
@@ -188,38 +153,10 @@ class AppState extends ChangeNotifier {
 
   bool get isFeaturesUnlocked => _featuresUnlocked;
   String get machineId => _machineId;
-  String get activePublicKeyHex => _activePublicKeyHex;
 
-  Future<void> setActivePublicKey(String hex) async {
-    final cleanHex = hex.trim();
-    if (!_isValidHex64(cleanHex)) {
-      throw ArgumentError('Invalid public key — must be 64 hex characters.');
-    }
-
-    _activePublicKeyHex = cleanHex;
-    await store.setSetting('activePublicKeyHex', cleanHex);
-
-    final storedLicenseKey = store.getSetting('licenseKey', '');
-    if (storedLicenseKey.isNotEmpty && _machineId.isNotEmpty) {
-      _featuresUnlocked = await LicenseVerifier.verifyLicenseKey(
-        storedLicenseKey,
-        _machineId,
-        overridePublicKeyHex: _activePublicKeyHex,
-      );
-    } else {
-      _featuresUnlocked = false;
-    }
-
-    notifyListeners();
-  }
-
-  Future<bool> unlockFeatures(String licenseKey, {String? overridePublicKeyHex}) async {
-    final key = licenseKey.trim();
-    if (key.isEmpty || _machineId.isEmpty) return false;
-
-    final pubHex = overridePublicKeyHex ?? _activePublicKeyHex;
-    final isValid = await LicenseVerifier.verifyLicenseKey(key, _machineId, overridePublicKeyHex: pubHex);
-    if (isValid) {
+  Future<bool> unlockFeatures(String code) async {
+    final key = code.trim();
+    if (LicenseVerifier.verifyUnlockCode(key)) {
       _featuresUnlocked = true;
       await store.setSetting('licenseKey', key);
       notifyListeners();
