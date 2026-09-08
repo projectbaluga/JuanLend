@@ -304,10 +304,6 @@ class LoanDetailScreen extends StatelessWidget {
     final apr = LoanUtils.computeAPR(effectiveMonthlyRate: monthlyEIR);
 
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: onBack),
-        title: const Text('Loan Details'),
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: ResponsiveContainer(

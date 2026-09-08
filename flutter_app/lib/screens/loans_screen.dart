@@ -8,6 +8,8 @@ import '../utils/loan_utils.dart';
 import '../widgets/app_badge.dart';
 import '../widgets/custom_card.dart';
 import '../widgets/responsive_container.dart';
+import '../widgets/screen_header.dart';
+import '../widgets/search_filter_bar.dart';
 
 class LoansScreen extends StatefulWidget {
   final Function(String) onSelectLoan;
@@ -930,46 +932,30 @@ class _LoansScreenState extends State<LoansScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Loans Portfolio', style: TextStyle(fontSize: isDesktop ? 20 : 18, fontWeight: FontWeight.bold)),
-                if (state.currentUser != null && state.currentUser!.role != 'viewer')
-                  ElevatedButton.icon(
-                    onPressed: () => _showNewLoanDialog(context),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('New Loan'),
-                  ),
-              ],
+            ScreenHeader(
+              title: 'Loans Portfolio',
+              action: (state.currentUser != null && state.currentUser!.role != 'viewer')
+                  ? ElevatedButton.icon(
+                      onPressed: () => _showNewLoanDialog(context),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('New Loan'),
+                    )
+                  : null,
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    decoration: const InputDecoration(
-                      hintText: 'Search purpose or borrower...',
-                      prefixIcon: Icon(Icons.search, size: 18),
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    onChanged: (val) => setState(() => _searchTerm = val),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                DropdownButton<String>(
-                  value: _statusFilter,
-                  items: const [
-                    DropdownMenuItem(value: 'all', child: Text('All Status')),
-                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                    DropdownMenuItem(value: 'active', child: Text('Active')),
-                    DropdownMenuItem(value: 'completed', child: Text('Completed')),
-                    DropdownMenuItem(value: 'defaulted', child: Text('Defaulted')),
-                    DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
-                  ],
-                  onChanged: (val) => setState(() => _statusFilter = val ?? 'all'),
-                ),
+            SearchFilterBar<String>(
+              hintText: 'Search purpose or borrower...',
+              onSearchChanged: (val) => setState(() => _searchTerm = val),
+              filterValue: _statusFilter,
+              filterItems: const [
+                DropdownMenuItem(value: 'all', child: Text('All Status')),
+                DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                DropdownMenuItem(value: 'active', child: Text('Active')),
+                DropdownMenuItem(value: 'completed', child: Text('Completed')),
+                DropdownMenuItem(value: 'defaulted', child: Text('Defaulted')),
+                DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
               ],
+              onFilterChanged: (val) => setState(() => _statusFilter = val ?? 'all'),
             ),
             const SizedBox(height: 12),
             Expanded(
