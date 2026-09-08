@@ -6,6 +6,8 @@ set -euo pipefail
 # - ICON_URL: (optional) URL to custom PNG app icon
 # - APP_NAME: (optional) Custom application name
 # - APP_DESCRIPTION: (optional) Custom app description
+# - BUILD_NAME: (optional) Version name (e.g. 1.2.3)
+# - BUILD_NUMBER: (optional) Build number integer (e.g. 10203 or 42)
 # NOTE: In-app Dart UI strings are driven dynamically via '--dart-define=APP_NAME=...' passed during build.
 # - BRAND_COLOR: (optional) Hex theme/background color (e.g. #18181B)
 
@@ -113,6 +115,30 @@ if [ -n "${BRAND_COLOR:-}" ]; then
   if [ -f "web/manifest.json" ]; then
     sed -i -E "s/\"background_color\": \"[^\"]*\"/\"background_color\": \"${BRAND_COLOR}\"/g" web/manifest.json
     sed -i -E "s/\"theme_color\": \"[^\"]*\"/\"theme_color\": \"${BRAND_COLOR}\"/g" web/manifest.json
+  fi
+fi
+
+# 5. VERSION & BUILD NUMBER OVERRIDES FOR WINDOWS RESOURCE (.rc)
+if [ -n "${BUILD_NAME:-}" ] || [ -n "${BUILD_NUMBER:-}" ]; then
+  echo "Setting Windows Resource Version: BUILD_NAME=${BUILD_NAME:-1.0.0}, BUILD_NUMBER=${BUILD_NUMBER:-1}"
+  if [ -f "windows/runner/Runner.rc" ]; then
+    VER_NAME="${BUILD_NAME:-1.0.0}"
+    BUILD_NUM="${BUILD_NUMBER:-1}"
+
+    # Extract major, minor, patch numbers from VER_NAME
+    IFS='.' read -r MAJOR MINOR PATCH <<< "${VER_NAME}"
+    MAJOR="${MAJOR:-1}"
+    MINOR="${MINOR:-0}"
+    PATCH="${PATCH:-0}"
+
+    NUM_VERSION="${MAJOR},${MINOR},${PATCH},${BUILD_NUM}"
+    STR_VERSION="${VER_NAME}+${BUILD_NUM}"
+
+    echo "Updating Runner.rc VERSION_AS_NUMBER: ${NUM_VERSION}"
+    echo "Updating Runner.rc VERSION_AS_STRING: \"${STR_VERSION}\""
+
+    sed -i -E "s/#define VERSION_AS_NUMBER [0-9,]+/#define VERSION_AS_NUMBER ${NUM_VERSION}/g" windows/runner/Runner.rc
+    sed -i -E "s/#define VERSION_AS_STRING \"[^\"]*\"/#define VERSION_AS_STRING \"${STR_VERSION}\"/g" windows/runner/Runner.rc
   fi
 fi
 

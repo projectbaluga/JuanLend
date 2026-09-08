@@ -161,6 +161,8 @@ jobs:
           APP_NAME: ${{ inputs.app_name || vars.APP_NAME }}
           APP_DESCRIPTION: ${{ inputs.app_description || vars.APP_DESCRIPTION }}
           BRAND_COLOR: ${{ inputs.brand_color || vars.BRAND_COLOR }}
+          BUILD_NAME: ${{ needs.version.outputs.version_name }}
+          BUILD_NUMBER: ${{ needs.version.outputs.build_number }}
         run: bash tool/apply_branding.sh
 
       - name: Analyze Dart code
@@ -212,6 +214,8 @@ jobs:
           APP_NAME: ${{ inputs.app_name || vars.APP_NAME }}
           APP_DESCRIPTION: ${{ inputs.app_description || vars.APP_DESCRIPTION }}
           BRAND_COLOR: ${{ inputs.brand_color || vars.BRAND_COLOR }}
+          BUILD_NAME: ${{ needs.version.outputs.version_name }}
+          BUILD_NUMBER: ${{ needs.version.outputs.build_number }}
         run: bash tool/apply_branding.sh
 
       - name: Build iOS App (Release, Unsigned)
@@ -248,6 +252,8 @@ jobs:
           APP_NAME: ${{ inputs.app_name || vars.APP_NAME }}
           APP_DESCRIPTION: ${{ inputs.app_description || vars.APP_DESCRIPTION }}
           BRAND_COLOR: ${{ inputs.brand_color || vars.BRAND_COLOR }}
+          BUILD_NAME: ${{ needs.version.outputs.version_name }}
+          BUILD_NUMBER: ${{ needs.version.outputs.build_number }}
         run: bash tool/apply_branding.sh
 
       - name: Build macOS App (Release)
@@ -284,6 +290,8 @@ jobs:
           APP_NAME: ${{ inputs.app_name || vars.APP_NAME }}
           APP_DESCRIPTION: ${{ inputs.app_description || vars.APP_DESCRIPTION }}
           BRAND_COLOR: ${{ inputs.brand_color || vars.BRAND_COLOR }}
+          BUILD_NAME: ${{ needs.version.outputs.version_name }}
+          BUILD_NUMBER: ${{ needs.version.outputs.build_number }}
         run: bash tool/apply_branding.sh
 
       - name: Analyze Dart code
