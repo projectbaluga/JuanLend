@@ -851,6 +851,10 @@ class LoanDetailScreen extends StatelessWidget {
                       separatorBuilder: (_, __) => const Divider(height: 12),
                       itemBuilder: (context, idx) {
                         final p = loan.payments[idx];
+                        final recBy = p.recordedBy.isNotEmpty
+                            ? (p.recordedByRole.isNotEmpty ? '${p.recordedBy} (${p.recordedByRole})' : p.recordedBy)
+                            : '';
+
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -858,12 +862,26 @@ class LoanDetailScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(LoanUtils.formatCurrency(p.amount, state.currencyCode),
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                                Text('via ${p.method} • ${p.note}',
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
+                                Text('via ${p.method}${p.note.isNotEmpty ? ' • ${p.note}' : ''}',
                                     style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                if (recBy.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text('Recorded by $recBy', style: const TextStyle(fontSize: 9, color: Colors.grey)),
+                                ],
                               ],
                             ),
-                            Text(LoanUtils.formatDate(p.date), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(LoanUtils.formatDate(p.date), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                if (p.recordedAt.isNotEmpty)
+                                  Text(
+                                    p.recordedAt.length >= 10 ? p.recordedAt.substring(0, 10) : p.recordedAt,
+                                    style: const TextStyle(fontSize: 9, color: Colors.grey),
+                                  ),
+                              ],
+                            ),
                           ],
                         );
                       },

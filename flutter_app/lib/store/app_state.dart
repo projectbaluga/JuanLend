@@ -11,6 +11,7 @@ import 'package:pointycastle/macs/hmac.dart';
 import '../models/borrower.dart';
 import '../models/loan.dart';
 import '../models/payment.dart';
+import '../models/payment_log_entry.dart';
 import '../models/user.dart';
 import '../utils/license_verifier.dart';
 import '../utils/loan_utils.dart';
@@ -362,6 +363,49 @@ class AppState extends ChangeNotifier {
         .toList();
   }
 
+  List<PaymentLogEntry> get allPayments {
+    final borrowerMap = {for (var b in borrowers) b.id: b};
+    final List<PaymentLogEntry> entries = [];
+
+    for (final loan in loans) {
+      final borrower = borrowerMap[loan.borrowerId] ??
+          Borrower(
+            id: loan.borrowerId,
+            fullName: 'Unknown Borrower',
+            email: '',
+            phone: '',
+            address: '',
+            idNumber: '',
+            employment: '',
+            monthlyIncome: 0.0,
+            creditScore: 50,
+            riskRating: 'medium',
+            notes: '',
+          );
+
+      final stats = LoanUtils.getLoanStats(loan);
+
+      for (final payment in loan.payments) {
+        entries.add(
+          PaymentLogEntry(
+            payment: payment,
+            loan: loan,
+            borrower: borrower,
+            outstandingBalanceAtPayment: stats.outstandingBalance,
+          ),
+        );
+      }
+    }
+
+    entries.sort((a, b) {
+      final cmpDate = b.payment.date.compareTo(a.payment.date);
+      if (cmpDate != 0) return cmpDate;
+      return b.payment.recordedAt.compareTo(a.payment.recordedAt);
+    });
+
+    return entries;
+  }
+
   static const String _backupHmacSecret = 'microlend_backup_integrity_key_v1';
 
   String exportDataJson({String? passphrase}) {
@@ -643,11 +687,17 @@ class AppState extends ChangeNotifier {
       await store.updateItem('loans', loanId, {'accrued_penalty': accruedPenaltyNow});
     }
 
+    final stampedPayment = payment.copyWith(
+      recordedBy: payment.recordedBy.isNotEmpty ? payment.recordedBy : (_currentUser?.username ?? _currentUser?.id ?? 'System'),
+      recordedByRole: payment.recordedByRole.isNotEmpty ? payment.recordedByRole : (_currentUser?.role ?? ''),
+      recordedAt: payment.recordedAt.isNotEmpty ? payment.recordedAt : DateTime.now().toIso8601String(),
+    );
+
     final updatedLoanMap = await store.appendToItemArray(
       'loans',
       loanId,
       'payments',
-      payment.toMap(),
+      stampedPayment.toMap(),
     );
 
     if (updatedLoanMap == null) return;

@@ -6,6 +6,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/loan_detail_screen.dart';
 import 'screens/loans_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/payment_log_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/users_screen.dart';
 import 'widgets/responsive_container.dart';
@@ -244,6 +245,15 @@ class _MainShellState extends State<MainShell> {
         builder: (s) => LoansScreen(
           onSelectLoan: (id) => s.setState(() => s._selectedLoanId = id),
           initialBorrowerId: s._issueLoanBorrowerId,
+        ),
+      ),
+      _NavDestination(
+        key: 'payments',
+        label: 'Payments',
+        iconOutline: Icons.receipt_long_outlined,
+        iconSelected: Icons.receipt_long,
+        builder: (s) => PaymentLogScreen(
+          onSelectLoan: (id) => s.setState(() => s._selectedLoanId = id),
         ),
       ),
       if (!isSoloMode)
