@@ -9,6 +9,7 @@ import 'package:pointycastle/key_derivators/api.dart';
 import 'package:pointycastle/key_derivators/pbkdf2.dart';
 import 'package:pointycastle/macs/hmac.dart';
 import '../models/borrower.dart';
+import '../models/credit_application.dart';
 import '../models/loan.dart';
 import '../models/payment.dart';
 import '../models/payment_log_entry.dart';
@@ -738,6 +739,55 @@ class AppState extends ChangeNotifier {
       throw ArgumentError('Cannot transition loan status from "${loan.status}" to "$status".');
     }
     await store.updateItem('loans', loanId, {'status': status});
+    notifyListeners();
+  }
+
+  Future<void> applyCredit(
+    String loanId, {
+    required int installmentNo,
+    required double amount,
+    required String date,
+  }) async {
+    if (_currentUser == null || (_currentUser!.role != 'officer' && _currentUser!.role != 'approver')) {
+      throw StateError('Unauthorized: Role "${_currentUser?.role ?? "unauthenticated"}" cannot apply credit.');
+    }
+
+    if (amount <= 0) {
+      throw ArgumentError('Amount must be greater than 0.');
+    }
+
+    final existingLoan = loans.firstWhere((l) => l.id == loanId);
+    final stats = LoanUtils.getLoanStats(existingLoan);
+
+    if (amount > stats.heldCredit + LoanUtils.kPaymentEpsilon) {
+      throw ArgumentError('Requested amount (${LoanUtils.formatCurrency(amount, currencyCode)}) exceeds available held credit (${LoanUtils.formatCurrency(stats.heldCredit, currencyCode)}).');
+    }
+
+    final newApp = CreditApplication(
+      id: 'cred_app_${DateTime.now().millisecondsSinceEpoch}',
+      amount: LoanUtils.round2(amount),
+      appliedToInstallmentNo: installmentNo,
+      date: date.isNotEmpty ? date : DateTime.now().toIso8601String().split('T')[0],
+      appliedBy: _currentUser?.username ?? _currentUser?.id ?? 'System',
+    );
+
+    final updatedLoanMap = await store.appendToItemArray(
+      'loans',
+      loanId,
+      'credit_applications',
+      newApp.toMap(),
+    );
+
+    if (updatedLoanMap == null) return;
+
+    final updatedLoan = Loan.fromMap(updatedLoanMap);
+    final statsAfter = LoanUtils.getLoanStats(updatedLoan);
+    final totalRequired = LoanUtils.round2(statsAfter.totalScheduled + statsAfter.penaltyAmount);
+
+    if ((statsAfter.totalPaid + updatedLoan.creditApplications.fold(0.0, (s, ca) => s + ca.amount)) >= totalRequired && existingLoan.status == 'active') {
+      await store.updateItem('loans', loanId, {'status': 'completed'});
+    }
+
     notifyListeners();
   }
 

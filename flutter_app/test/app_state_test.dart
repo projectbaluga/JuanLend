@@ -555,7 +555,7 @@ void main() {
 
       final lumpSumPayment = Payment(
         id: 'p_lumpsum_1',
-        date: '2026-01-15',
+        date: '2026-06-01', // Date set on/after last installment due date to cover all due installments in lump sum
         amount: totalScheduled + 100.10, // covers all 5 installments + 100.10 excess
         method: 'Bank Transfer',
         note: 'Lump Sum Settlement',
