@@ -37,6 +37,7 @@ class DashboardScreen extends StatelessWidget {
     double overdueAmount = 0.0;
     double collectedThisMonth = 0.0;
     double expectedThisMonth = 0.0;
+    double grandTotalCollected = 0.0;
 
     final now = DateTime.now();
     final currentYearMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
@@ -55,6 +56,7 @@ class DashboardScreen extends StatelessWidget {
       }
 
       for (var pay in loan.payments) {
+        grandTotalCollected += pay.amount;
         if (pay.date.startsWith(currentYearMonth)) {
           collectedThisMonth += pay.amount;
         }
@@ -66,6 +68,9 @@ class DashboardScreen extends StatelessWidget {
         }
       }
     }
+
+    final netProfit = grandTotalCollected - totalDisbursed;
+    final capitalBalance = state.capital + netProfit;
 
     // Cash flow data
     final List<FlSpot> expectedSpots = [];
@@ -180,16 +185,40 @@ class DashboardScreen extends StatelessWidget {
               childAspectRatio: statChildAspectRatio,
               children: [
                 StatCard(
-                  title: 'Active Loans',
-                  value: '$activeLoansCount',
-                  subtext: 'In good standing',
-                  icon: Icons.trending_up,
+                  title: 'Capital (Puhunan)',
+                  value: LoanUtils.formatCurrency(state.capital, state.currencyCode),
+                  subtext: 'Starting capital fund',
+                  icon: Icons.account_balance,
+                ),
+                StatCard(
+                  title: 'Capital Balance',
+                  value: LoanUtils.formatCurrency(capitalBalance, state.currencyCode),
+                  subtext: 'Capital + profit',
+                  icon: Icons.account_balance_wallet,
+                ),
+                StatCard(
+                  title: 'Net Profit',
+                  value: LoanUtils.formatCurrency(netProfit, state.currencyCode),
+                  subtext: 'Collected - disbursed',
+                  icon: Icons.show_chart,
                 ),
                 StatCard(
                   title: 'Total Disbursed',
                   value: LoanUtils.formatCurrency(totalDisbursed, state.currencyCode),
-                  subtext: 'Net disbursed principal',
+                  subtext: 'All-time disbursed loans',
                   icon: Icons.attach_money,
+                ),
+                StatCard(
+                  title: 'Total Collected',
+                  value: LoanUtils.formatCurrency(grandTotalCollected, state.currencyCode),
+                  subtext: 'All-time repayments',
+                  icon: Icons.monetization_on,
+                ),
+                StatCard(
+                  title: 'Active Loans',
+                  value: '$activeLoansCount',
+                  subtext: 'In good standing',
+                  icon: Icons.trending_up,
                 ),
                 StatCard(
                   title: 'Outstanding',

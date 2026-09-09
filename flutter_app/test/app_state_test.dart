@@ -309,6 +309,18 @@ void main() {
       expect(appState.appName, equals(appState.businessName));
     });
 
+    test('AppState capital property defaults to 0.0 and persists via setCapital', () async {
+      expect(appState.capital, 0.0);
+
+      await appState.setCapital(150000.0);
+      expect(appState.capital, 150000.0);
+      expect(store.getSetting('capital', '0.0'), '150000.0');
+
+      // Re-instantiate AppState to verify re-hydration from store
+      final rehydrated = AppState(store);
+      expect(rehydrated.capital, 150000.0);
+    });
+
     test('reload re-hydrates preferences and notifies listeners', () async {
       bool notified = false;
       appState.addListener(() => notified = true);
@@ -630,7 +642,7 @@ void main() {
       expect(allPayments.first.payment.date.compareTo(allPayments.last.payment.date) >= 0, isTrue);
     });
 
-    test('deleteLoan enforces approver role, deletes loan, and updates store', () async {
+    test('deleteLoan enforces approver role, guards against deleting loans with payments, and updates store', () async {
       final loanToDelete = Loan(
         id: 'loan_to_delete',
         borrowerId: 'b1',
@@ -654,10 +666,16 @@ void main() {
       // Viewer cannot delete loan
       expect(() => appState.deleteLoan('loan_to_delete'), throwsStateError);
 
-      // Approver can delete loan
+      // Add a payment to loan
       await appState.login('admin', 'admin123');
-      await appState.deleteLoan('loan_to_delete');
+      final testPayment = Payment(id: 'p_guard_del', date: '2026-01-02', amount: 100.0, method: 'Cash', note: '');
+      await appState.recordPayment('loan_to_delete', testPayment);
 
+      // Deleting loan with payments without override throws StateError
+      expect(() => appState.deleteLoan('loan_to_delete'), throwsStateError);
+
+      // Deleting with override succeeds
+      await appState.deleteLoan('loan_to_delete', overrideWithPayments: true);
       expect(appState.loans.any((l) => l.id == 'loan_to_delete'), isFalse);
     });
 

@@ -46,6 +46,7 @@ class AppState extends ChangeNotifier {
   late String _defaultInterestMethod;
   late String _defaultPenaltyType;
   late double _defaultPenaltyValue;
+  late double _capital;
   late ThemeMode _themeMode;
   bool _featuresUnlocked = false;
   String _machineId = '';
@@ -67,6 +68,7 @@ class AppState extends ChangeNotifier {
     _defaultInterestMethod = store.getSetting('defaultInterestMethod', 'flat');
     _defaultPenaltyType = store.getSetting('defaultPenaltyType', 'none');
     _defaultPenaltyValue = double.tryParse(store.getSetting('defaultPenaltyValue', '0.0')) ?? 0.0;
+    _capital = double.tryParse(store.getSetting('capital', '0.0')) ?? 0.0;
 
     LoanUtils.defaultCurrencyCode = _currencyCode;
     LoanUtils.defaultDateFormat = _dateFormat;
@@ -168,8 +170,15 @@ class AppState extends ChangeNotifier {
   String get defaultInterestMethod => _defaultInterestMethod;
   String get defaultPenaltyType => _defaultPenaltyType;
   double get defaultPenaltyValue => _defaultPenaltyValue;
+  double get capital => _capital;
   ThemeMode get themeMode => _themeMode;
   bool get isDarkMode => _themeMode == ThemeMode.dark;
+
+  Future<void> setCapital(double value) async {
+    _capital = value;
+    await store.setSetting('capital', value.toString());
+    notifyListeners();
+  }
 
   bool get isFeaturesUnlocked => _featuresUnlocked;
   String get machineId => _machineId;
@@ -622,9 +631,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> deleteLoan(String id) async {
+  Future<void> deleteLoan(String id, {bool overrideWithPayments = false}) async {
     if (_currentUser == null || (!isSoloMode && _currentUser!.role != 'approver')) {
       throw StateError('Unauthorized: Only approvers can delete loans.');
+    }
+
+    final match = loans.where((l) => l.id == id).toList();
+    if (match.isEmpty) {
+      throw ArgumentError('Loan not found.');
+    }
+
+    final targetLoan = match.first;
+    if (targetLoan.payments.isNotEmpty && !overrideWithPayments) {
+      throw StateError('Cannot delete loan with recorded payments (${targetLoan.payments.length}). Void all payments first or request an explicit override.');
     }
 
     await store.deleteItem('loans', id);
