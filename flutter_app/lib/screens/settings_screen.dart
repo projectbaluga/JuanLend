@@ -249,32 +249,7 @@ class SettingsScreen extends StatelessWidget {
                 const SizedBox(height: 12),
               ],
 
-              // Appearance Section
-              CustomCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Appearance', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Dark Mode', style: TextStyle(fontSize: 13)),
-                      subtitle: const Text('Use dark theme palette', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                      value: state.isDarkMode,
-                      onChanged: (val) => state.setThemeMode(val ? ThemeMode.dark : ThemeMode.light),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Full Features / Unlock Section
-              const _FullFeaturesSection(),
-
-              const SizedBox(height: 16),
-
-              // Business / Operator Section
+              // 1. Business / Operator Section
               _BusinessNameSection(
                 initialName: state.businessName,
                 onSave: (newName) => state.setBusinessName(newName),
@@ -282,7 +257,7 @@ class SettingsScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Currency & Formatting Section
+              // 2. Currency & Formatting Section
               CustomCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,7 +306,7 @@ class SettingsScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Loan Defaults Section
+              // 3. Loan Defaults Section
               CustomCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,7 +393,32 @@ class SettingsScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // Data & Backup Section
+              // 4. Appearance Section
+              CustomCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Appearance', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Dark Mode', style: TextStyle(fontSize: 13)),
+                      subtitle: const Text('Use dark theme palette', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      value: state.isDarkMode,
+                      onChanged: (val) => state.setThemeMode(val ? ThemeMode.dark : ThemeMode.light),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // 5. Full Features / Unlock Section
+              const _FullFeaturesSection(),
+
+              const SizedBox(height: 16),
+
+              // 6. Data & Backup Section
               CustomCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -503,7 +503,7 @@ class SettingsScreen extends StatelessWidget {
 
               const SizedBox(height: 16),
 
-              // About Section
+              // 7. About Section
               CustomCard(
                 child: FutureBuilder<PackageInfo>(
                   future: PackageInfo.fromPlatform(),
