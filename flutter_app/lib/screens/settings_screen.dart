@@ -726,30 +726,42 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Full Features', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          Row(
+            children: const [
+              Icon(Icons.workspace_premium, size: 18),
+              SizedBox(width: 8),
+              Text('License', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 12),
 
           if (state.isFeaturesUnlocked) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: const [
-                    Icon(Icons.check_circle, size: 18, color: Colors.greenAccent),
-                    SizedBox(width: 8),
-                    Text('Full Features Unlocked', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  ],
-                ),
-                TextButton.icon(
-                  onPressed: () => state.lockFeatures(),
-                  icon: const Icon(Icons.lock, size: 16),
-                  label: const Text('Lock again'),
-                ),
-              ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.verified, size: 16, color: Colors.green),
+                  SizedBox(width: 6),
+                  Text(
+                    'License Active',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.green),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'All features are enabled for this device.',
+              style: TextStyle(fontSize: 11, color: Colors.grey),
             ),
           ] else ...[
             const Text(
-              'Unlicensed edition is limited to 5 borrowers. Enter unlock code to enable full features.',
+              'The unlicensed edition is limited to 5 borrowers. Enter your license key below to activate the full edition.',
               style: TextStyle(fontSize: 11, color: Colors.grey),
             ),
             const SizedBox(height: 12),
@@ -759,7 +771,8 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
                   child: TextField(
                     controller: _licenseCtrl,
                     decoration: const InputDecoration(
-                      hintText: 'Enter unlock code...',
+                      hintText: 'License key',
+                      prefixIcon: Icon(Icons.vpn_key, size: 16),
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                       border: OutlineInputBorder(),
@@ -767,7 +780,7 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: () async {
                     final key = _licenseCtrl.text;
                     if (key.trim().isEmpty) return;
@@ -776,15 +789,16 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
                     if (success) {
                       _licenseCtrl.clear();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Full features successfully unlocked!')),
+                        const SnackBar(content: Text('License activated successfully.')),
                       );
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invalid unlock code')),
+                        const SnackBar(content: Text('Invalid license key. Please check and try again.')),
                       );
                     }
                   },
-                  child: const Text('Unlock'),
+                  icon: const Icon(Icons.check, size: 16),
+                  label: const Text('Activate'),
                 ),
               ],
             ),
