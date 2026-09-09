@@ -315,8 +315,8 @@ class _LoansScreenState extends State<LoansScreen> {
                                         const SizedBox(height: 10),
                                         SwitchListTile(
                                           contentPadding: EdgeInsets.zero,
-                                          title: const Text('Kaltas-agad ang interes (Deduct interest upfront)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                                          subtitle: const Text('Ibabawas agad ang interes sa ibibigay na cash; buo pa rin ang principal na babayaran.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                          title: const Text('Deduct Interest Upfront', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                          subtitle: const Text('Interest is deducted from the disbursed cash; the borrower still repays the full principal.', style: TextStyle(fontSize: 11, color: Colors.grey)),
                                           value: deductInterestUpfront,
                                           onChanged: (val) => setModalState(() => deductInterestUpfront = val),
                                         ),

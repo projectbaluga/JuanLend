@@ -901,7 +901,7 @@ class _BusinessNameSectionState extends State<_BusinessNameSection> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
-                  Text('Capital / Puhunan', style: TextStyle(fontSize: 13)),
+                  Text('Capital', style: TextStyle(fontSize: 13)),
                   Text('Starting cash fund', style: TextStyle(fontSize: 10, color: Colors.grey)),
                 ],
               ),

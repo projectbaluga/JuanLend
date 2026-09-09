@@ -77,6 +77,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     double outstandingBalance = 0.0;
     double overdueAmount = 0.0;
     double grandTotalCollected = 0.0;
+    double totalHeldCredit = 0.0;
 
     final now = DateTime.now();
 
@@ -91,6 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         totalDisbursed += stats.totalDisbursed;
         outstandingBalance += stats.outstandingBalance;
         overdueAmount += stats.overdueAmount;
+        totalHeldCredit += stats.heldCredit;
       }
 
       for (var pay in loan.payments) {
@@ -245,31 +247,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ],
                       ),
                     ),
-                    if (isDesktop)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.today, color: Color(0xFF10B981), size: 18),
-                            const SizedBox(width: 8),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text("Today's Collections", style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                Text(
-                                  LoanUtils.formatCurrency(metrics.todaysCollections, state.currencyCode),
-                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -310,7 +287,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 20),
               ],
 
-              // Stat Cards Grid
+              // Primary 6 Stat Cards Grid
               GridView.count(
                 crossAxisCount: statGridColumns,
                 shrinkWrap: true,
@@ -319,13 +296,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 mainAxisSpacing: 12,
                 childAspectRatio: statChildAspectRatio,
                 children: [
-                  StatCard(
-                    title: 'Capital (Puhunan)',
-                    value: LoanUtils.formatCurrency(state.capital, state.currencyCode),
-                    subtext: 'Starting capital fund',
-                    icon: Icons.account_balance,
-                    accentColor: const Color(0xFF0284C7),
-                  ),
                   StatCard(
                     title: 'Capital Balance',
                     value: LoanUtils.formatCurrency(capitalBalance, state.currencyCode),
@@ -341,19 +311,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     accentColor: netProfit >= 0 ? const Color(0xFF10B981) : Colors.redAccent,
                   ),
                   StatCard(
-                    title: 'Collection Rate',
-                    value: '${metrics.collectionRate}%',
-                    subtext: 'Repaid / Disbursed',
-                    icon: Icons.pie_chart_outline,
-                    accentColor: const Color(0xFF10B981),
-                  ),
-                  StatCard(
-                    title: 'Portfolio at Risk',
-                    value: '${metrics.portfolioAtRisk}%',
-                    subtext: 'Overdue / Outstanding',
-                    icon: Icons.security,
-                    accentColor: metrics.portfolioAtRisk > 0 ? Colors.redAccent : const Color(0xFF10B981),
-                    onTap: overdueLoans.isNotEmpty ? _scrollToOverdue : null,
+                    title: 'Outstanding',
+                    value: LoanUtils.formatCurrency(outstandingBalance, state.currencyCode),
+                    subtext: 'Remaining balance',
+                    icon: Icons.access_time,
+                    accentColor: const Color(0xFF8B5CF6),
                   ),
                   StatCard(
                     title: 'Today\'s Collections',
@@ -363,43 +325,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     accentColor: const Color(0xFF059669),
                   ),
                   StatCard(
-                    title: 'Due This Week',
-                    value: LoanUtils.formatCurrency(metrics.dueThisWeek, state.currencyCode),
-                    subtext: 'Next 7 days due',
-                    icon: Icons.date_range,
-                    accentColor: const Color(0xFFF59E0B),
-                  ),
-                  StatCard(
-                    title: 'Total Disbursed',
-                    value: LoanUtils.formatCurrency(totalDisbursed, state.currencyCode),
-                    subtext: 'All-time disbursed loans',
-                    icon: Icons.attach_money,
-                    accentColor: const Color(0xFF3B82F6),
-                    onTap: widget.onViewLoans,
-                  ),
-                  StatCard(
-                    title: 'Total Collected',
-                    value: LoanUtils.formatCurrency(grandTotalCollected, state.currencyCode),
-                    subtext: 'All-time repayments',
-                    icon: Icons.monetization_on,
-                    accentColor: const Color(0xFF10B981),
-                  ),
-                  StatCard(
-                    title: 'Active Loans',
-                    value: '$activeLoansCount',
-                    subtext: '${metrics.activeBorrowersCount} active borrowers',
-                    icon: Icons.trending_up,
-                    accentColor: const Color(0xFF10B981),
-                    onTap: widget.onViewLoans,
-                  ),
-                  StatCard(
-                    title: 'Outstanding',
-                    value: LoanUtils.formatCurrency(outstandingBalance, state.currencyCode),
-                    subtext: 'Remaining balance',
-                    icon: Icons.access_time,
-                    accentColor: const Color(0xFF8B5CF6),
-                  ),
-                  StatCard(
                     title: 'Overdue',
                     value: LoanUtils.formatCurrency(overdueAmount, state.currencyCode),
                     subtext: '${overdueLoans.length} loans requiring action',
@@ -407,7 +332,95 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     accentColor: overdueLoans.isNotEmpty ? Colors.redAccent : Colors.grey,
                     onTap: overdueLoans.isNotEmpty ? _scrollToOverdue : null,
                   ),
+                  StatCard(
+                    title: 'Portfolio at Risk',
+                    value: '${metrics.portfolioAtRisk}%',
+                    subtext: 'Overdue / Outstanding',
+                    icon: Icons.security,
+                    accentColor: metrics.portfolioAtRisk > 0 ? Colors.redAccent : const Color(0xFF10B981),
+                    onTap: overdueLoans.isNotEmpty ? _scrollToOverdue : null,
+                  ),
                 ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // Collapsible "More metrics" Section
+              CustomCard(
+                padding: EdgeInsets.zero,
+                child: Theme(
+                  data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'More metrics',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    childrenPadding: const EdgeInsets.all(12.0),
+                    children: [
+                      GridView.count(
+                        crossAxisCount: statGridColumns,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: statChildAspectRatio,
+                        children: [
+                          StatCard(
+                            title: 'Capital',
+                            value: LoanUtils.formatCurrency(state.capital, state.currencyCode),
+                            subtext: 'Starting capital fund',
+                            icon: Icons.account_balance,
+                            accentColor: const Color(0xFF0284C7),
+                          ),
+                          StatCard(
+                            title: 'Collection Rate',
+                            value: '${metrics.collectionRate}%',
+                            subtext: 'Repaid / Disbursed',
+                            icon: Icons.pie_chart_outline,
+                            accentColor: const Color(0xFF10B981),
+                          ),
+                          StatCard(
+                            title: 'Due This Week',
+                            value: LoanUtils.formatCurrency(metrics.dueThisWeek, state.currencyCode),
+                            subtext: 'Next 7 days due',
+                            icon: Icons.date_range,
+                            accentColor: const Color(0xFFF59E0B),
+                          ),
+                          StatCard(
+                            title: 'Total Disbursed',
+                            value: LoanUtils.formatCurrency(totalDisbursed, state.currencyCode),
+                            subtext: 'All-time disbursed loans',
+                            icon: Icons.attach_money,
+                            accentColor: const Color(0xFF3B82F6),
+                            onTap: widget.onViewLoans,
+                          ),
+                          StatCard(
+                            title: 'Total Collected',
+                            value: LoanUtils.formatCurrency(grandTotalCollected, state.currencyCode),
+                            subtext: 'All-time repayments',
+                            icon: Icons.monetization_on,
+                            accentColor: const Color(0xFF10B981),
+                          ),
+                          StatCard(
+                            title: 'Active Loans',
+                            value: '$activeLoansCount',
+                            subtext: '${metrics.activeBorrowersCount} active borrowers',
+                            icon: Icons.trending_up,
+                            accentColor: const Color(0xFF10B981),
+                            onTap: widget.onViewLoans,
+                          ),
+                          StatCard(
+                            title: 'Held Credit',
+                            value: LoanUtils.formatCurrency(totalHeldCredit, state.currencyCode),
+                            subtext: 'Unapplied overpayments',
+                            icon: Icons.savings,
+                            accentColor: const Color(0xFF0284C7),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
 
               const SizedBox(height: 20),

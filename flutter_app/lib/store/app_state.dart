@@ -74,8 +74,8 @@ class AppState extends ChangeNotifier {
     LoanUtils.defaultCurrencyCode = _currencyCode;
     LoanUtils.defaultDateFormat = _dateFormat;
 
-    final savedTheme = store.getSetting('themeMode', 'dark');
-    _themeMode = savedTheme == 'light' ? ThemeMode.light : ThemeMode.dark;
+    final savedTheme = store.getSetting('themeMode', 'light');
+    _themeMode = savedTheme == 'dark' ? ThemeMode.dark : ThemeMode.light;
 
     final storedLicenseKey = store.getSetting('licenseKey', '');
     _featuresUnlocked = LicenseVerifier.verifyUnlockCode(storedLicenseKey);
