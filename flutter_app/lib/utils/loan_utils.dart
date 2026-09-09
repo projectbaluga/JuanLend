@@ -207,7 +207,7 @@ class LoanUtils {
     int termCount,
     String disbursementDate, {
     String repaymentFrequency = 'monthly',
-    String interestMethod = 'reducing',
+    String interestMethod = 'flat',
   }) {
     final p = max(0.0, principal);
     final rate = max(0.0, interestRate);
@@ -223,81 +223,7 @@ class LoanUtils {
 
     final List<ScheduleInstallment> schedule = [];
 
-    if (interestMethod == 'flat') {
-      // Note: Flat/Add-on ("5-6") interest is intentionally period-independent (total interest = principal * rate / 100) regardless of term length.
-      final totalInterest = p * (rate / 100.0);
-      final principalPerPeriod = p / n;
-      final interestPerPeriod = totalInterest / n;
-      double balance = p;
-
-      for (int i = 1; i <= n; i++) {
-        final dueDate = calculateDueDate(startDate, repaymentFrequency, i);
-        final dueDateStr = DateFormat('yyyy-MM-dd').format(dueDate);
-
-        double prin = principalPerPeriod;
-        double instInterest = interestPerPeriod;
-
-        if (i == n) {
-          prin = balance;
-          balance = 0.0;
-        } else {
-          balance -= prin;
-        }
-
-        schedule.add(ScheduleInstallment(
-          installmentNo: i,
-          dueDate: dueDateStr,
-          amount: round2(prin + instInterest),
-          principal: round2(prin),
-          interest: round2(instInterest),
-          balance: max(0.0, round2(balance)),
-        ));
-      }
-      return schedule;
-    }
-
-    if (interestMethod == 'interest_only') {
-      double perPeriodRate = 0.0;
-      switch (repaymentFrequency) {
-        case 'daily':
-          perPeriodRate = (rate / 100.0) / 365.0;
-          break;
-        case 'weekly':
-          perPeriodRate = (rate / 100.0) / 52.0;
-          break;
-        case 'biweekly':
-          perPeriodRate = (rate / 100.0) / 26.0;
-          break;
-        case 'monthly':
-        default:
-          perPeriodRate = (rate / 100.0) / 12.0;
-          break;
-      }
-
-      final interestPerPeriod = p * perPeriodRate;
-      double balance = p;
-
-      for (int i = 1; i <= n; i++) {
-        final dueDate = calculateDueDate(startDate, repaymentFrequency, i);
-        final dueDateStr = DateFormat('yyyy-MM-dd').format(dueDate);
-
-        final prin = (i == n) ? p : 0.0;
-        if (i == n) balance = 0.0;
-
-        schedule.add(ScheduleInstallment(
-          installmentNo: i,
-          dueDate: dueDateStr,
-          amount: round2(prin + interestPerPeriod),
-          principal: round2(prin),
-          interest: round2(interestPerPeriod),
-          balance: max(0.0, round2(balance)),
-        ));
-      }
-      return schedule;
-    }
-
     if (interestMethod == 'one_time') {
-      // Note: One-time payment interest is intentionally period-independent.
       final dueDate = calculateDueDate(startDate, repaymentFrequency, 1);
       final dueDateStr = DateFormat('yyyy-MM-dd').format(dueDate);
       final totalInterest = p * (rate / 100.0);
@@ -313,56 +239,31 @@ class LoanUtils {
       return schedule;
     }
 
-    // Default: 'reducing' (amortizing balance)
-    double perPeriodRate = 0.0;
-    switch (repaymentFrequency) {
-      case 'daily':
-        perPeriodRate = (rate / 100.0) / 365.0;
-        break;
-      case 'weekly':
-        perPeriodRate = (rate / 100.0) / 52.0;
-        break;
-      case 'biweekly':
-        perPeriodRate = (rate / 100.0) / 26.0;
-        break;
-      case 'monthly':
-      default:
-        perPeriodRate = (rate / 100.0) / 12.0;
-        break;
-    }
-
-    final r = perPeriodRate;
-    double periodPayment = 0.0;
-    if (r > 0) {
-      periodPayment = (p * r * pow(1 + r, n)) / (pow(1 + r, n) - 1);
-    } else {
-      periodPayment = p / n;
-    }
-
+    // Default & 'flat': Flat / Add-on ("5-6")
+    final totalInterest = p * (rate / 100.0);
+    final principalPerPeriod = p / n;
+    final interestPerPeriod = totalInterest / n;
     double balance = p;
 
     for (int i = 1; i <= n; i++) {
       final dueDate = calculateDueDate(startDate, repaymentFrequency, i);
       final dueDateStr = DateFormat('yyyy-MM-dd').format(dueDate);
 
-      final interestForPeriod = balance * r;
-      double principalForPeriod = periodPayment - interestForPeriod;
+      double prin = (i == n) ? round2(balance) : round2(principalPerPeriod);
+      double instInterest = interestPerPeriod;
 
-      if (i == n || (balance - principalForPeriod) < 0.01) {
-        principalForPeriod = balance;
+      if (i == n) {
         balance = 0.0;
       } else {
-        balance -= principalForPeriod;
+        balance -= prin;
       }
-
-      final installmentAmount = principalForPeriod + interestForPeriod;
 
       schedule.add(ScheduleInstallment(
         installmentNo: i,
         dueDate: dueDateStr,
-        amount: round2(installmentAmount),
-        principal: round2(principalForPeriod),
-        interest: round2(interestForPeriod),
+        amount: round2(prin + instInterest),
+        principal: round2(prin),
+        interest: round2(instInterest),
         balance: max(0.0, round2(balance)),
       ));
     }
@@ -548,45 +449,7 @@ class LoanUtils {
 
   static double computeEarlyPayoffAmount(Loan loan, [DateTime? asOfDate]) {
     final stats = getLoanStats(loan, asOfDate);
-    if (loan.interestMethod != 'reducing') {
-      return stats.totalDueWithPenalty;
-    }
-
-    double remainingPrincipal = 0.0;
-    for (final inst in stats.scheduleWithStatus) {
-      if (inst.status != 'paid') {
-        final paidPct = inst.amount > 0 ? (inst.paidAmount / inst.amount) : 0.0;
-        final unpaidPrin = inst.principal * (1.0 - paidPct);
-        remainingPrincipal += unpaidPrin;
-      }
-    }
-    remainingPrincipal = round2(remainingPrincipal);
-
-    if (remainingPrincipal <= 0) {
-      return round2(stats.penaltyAmount);
-    }
-
-    DateTime lastDate;
-    try {
-      if (loan.payments.isNotEmpty) {
-        lastDate = DateTime.parse(loan.payments.last.date);
-      } else if (loan.disbursementDate.isNotEmpty) {
-        lastDate = DateTime.parse(loan.disbursementDate);
-      } else {
-        lastDate = DateTime.now();
-      }
-    } catch (_) {
-      lastDate = DateTime.now();
-    }
-
-    final refDate = asOfDate ?? DateTime.now();
-    final daysElapsed = max(0, refDate.difference(lastDate).inDays);
-
-    final dailyRate = (loan.interestRate / 100.0) / 365.0;
-    final accruedInterest = round2(remainingPrincipal * dailyRate * daysElapsed);
-
-    final payoff = round2(remainingPrincipal + accruedInterest + stats.penaltyAmount);
-    return min(payoff, stats.totalDueWithPenalty);
+    return stats.totalDueWithPenalty;
   }
 
   static String? validateLoanParams({
@@ -595,7 +458,7 @@ class LoanUtils {
     required int termCount,
     required String repaymentFrequency,
     required double penaltyValue,
-    String interestMethod = 'reducing',
+    String interestMethod = 'flat',
     String penaltyType = 'none',
   }) {
     if (principal <= 0) return 'Principal must be greater than 0.';
@@ -666,42 +529,7 @@ class LoanUtils {
     final totalRequired = round2(totalScheduled + penaltyAmount);
     final creditBalance = totalPaid > totalRequired ? round2(totalPaid - totalRequired) : 0.0;
 
-    // Compute early payoff figure
     double payoff = totalDueWithPenalty;
-    if (loan.interestMethod == 'reducing') {
-      double remainingPrincipal = 0.0;
-      for (final inst in scheduleWithStatus) {
-        if (inst.status != 'paid') {
-          final paidPct = inst.amount > 0 ? (inst.paidAmount / inst.amount) : 0.0;
-          final unpaidPrin = inst.principal * (1.0 - paidPct);
-          remainingPrincipal += unpaidPrin;
-        }
-      }
-      remainingPrincipal = round2(remainingPrincipal);
-
-      if (remainingPrincipal <= 0) {
-        payoff = round2(penaltyAmount);
-      } else {
-        DateTime lastDate;
-        try {
-          if (loan.payments.isNotEmpty) {
-            lastDate = DateTime.parse(loan.payments.last.date);
-          } else if (loan.disbursementDate.isNotEmpty) {
-            lastDate = DateTime.parse(loan.disbursementDate);
-          } else {
-            lastDate = DateTime.now();
-          }
-        } catch (_) {
-          lastDate = DateTime.now();
-        }
-
-        final daysElapsed = max(0, refDate.difference(lastDate).inDays);
-        final dailyRate = (loan.interestRate / 100.0) / 365.0;
-        final accruedInterest = round2(remainingPrincipal * dailyRate * daysElapsed);
-
-        payoff = min(round2(remainingPrincipal + accruedInterest + penaltyAmount), totalDueWithPenalty);
-      }
-    }
 
     return LoanStats(
       totalDisbursed: netDisbursed,

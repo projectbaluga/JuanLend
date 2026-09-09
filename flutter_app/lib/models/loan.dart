@@ -9,7 +9,7 @@ class Loan {
   final double interestRate;
   final int termMonths;
   final String repaymentFrequency; // 'daily', 'weekly', 'biweekly', 'monthly'
-  final String interestMethod; // 'reducing', 'flat', 'interest_only', 'one_time'
+  final String interestMethod; // 'flat', 'one_time'
   final int termCount;
   final String purpose;
   final String status;
@@ -44,7 +44,7 @@ class Loan {
     required this.interestRate,
     required this.termMonths,
     this.repaymentFrequency = 'monthly',
-    this.interestMethod = 'reducing',
+    this.interestMethod = 'flat',
     int? termCount,
     required this.purpose,
     required this.status,

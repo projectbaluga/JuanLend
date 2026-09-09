@@ -573,13 +573,6 @@ class LoanDetailScreen extends StatelessWidget {
                     Text('Total Due with Penalty: ${LoanUtils.formatCurrency(stats.totalDueWithPenalty, state.currencyCode)}',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.redAccent)),
                   ],
-                  if (loan.status == 'active' && loan.interestMethod == 'reducing') ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      'Early Payoff Settlement: ${LoanUtils.formatCurrency(stats.payoffAmount, state.currencyCode)}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                    ),
-                  ],
                   if (stats.creditBalance > 0) ...[
                     const SizedBox(height: 10),
                     Container(

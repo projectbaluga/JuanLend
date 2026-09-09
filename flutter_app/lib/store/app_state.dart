@@ -64,7 +64,7 @@ class AppState extends ChangeNotifier {
     _defaultTermPeriods = int.tryParse(termStr) ?? 6;
     _defaultInterestRate = double.tryParse(store.getSetting('defaultInterestRate', '12.0')) ?? 12.0;
     _defaultRepaymentFrequency = store.getSetting('defaultRepaymentFrequency', 'monthly');
-    _defaultInterestMethod = store.getSetting('defaultInterestMethod', 'reducing');
+    _defaultInterestMethod = store.getSetting('defaultInterestMethod', 'flat');
     _defaultPenaltyType = store.getSetting('defaultPenaltyType', 'none');
     _defaultPenaltyValue = double.tryParse(store.getSetting('defaultPenaltyValue', '0.0')) ?? 0.0;
 

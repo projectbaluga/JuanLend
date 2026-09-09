@@ -442,11 +442,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         const Text('Default Interest Method', style: TextStyle(fontSize: 13)),
                         DropdownButton<String>(
-                          value: state.defaultInterestMethod,
+                          value: (state.defaultInterestMethod == 'flat' || state.defaultInterestMethod == 'one_time')
+                              ? state.defaultInterestMethod
+                              : 'flat',
                           items: const [
-                            DropdownMenuItem(value: 'reducing', child: Text('Reducing Balance')),
                             DropdownMenuItem(value: 'flat', child: Text('Flat / Add-on ("5-6")')),
-                            DropdownMenuItem(value: 'interest_only', child: Text('Interest-Only')),
                             DropdownMenuItem(value: 'one_time', child: Text('One-Time Payment')),
                           ],
                           onChanged: (val) {
