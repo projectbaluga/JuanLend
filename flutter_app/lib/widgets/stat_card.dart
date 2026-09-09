@@ -6,6 +6,8 @@ class StatCard extends StatelessWidget {
   final String value;
   final String subtext;
   final IconData icon;
+  final VoidCallback? onTap;
+  final Color? accentColor;
 
   const StatCard({
     super.key,
@@ -13,14 +15,25 @@ class StatCard extends StatelessWidget {
     required this.value,
     required this.subtext,
     required this.icon,
+    this.onTap,
+    this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const zinc400 = Color(0xFFA1A1AA);
+    final iconColor = accentColor ?? (isDark ? zinc400 : Colors.grey.shade600);
 
-    return CustomCard(
+    final cardContent = Container(
+      decoration: accentColor != null
+          ? BoxDecoration(
+              border: Border(
+                left: BorderSide(color: accentColor!, width: 4),
+              ),
+              borderRadius: BorderRadius.circular(12),
+            )
+          : null,
       padding: const EdgeInsets.all(12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -41,7 +54,7 @@ class StatCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              Icon(icon, size: 16, color: isDark ? zinc400 : Colors.grey.shade600),
+              Icon(icon, size: 18, color: iconColor),
             ],
           ),
           const SizedBox(height: 8),
@@ -65,6 +78,17 @@ class StatCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    return CustomCard(
+      padding: EdgeInsets.zero,
+      child: onTap != null
+          ? InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: cardContent,
+            )
+          : cardContent,
     );
   }
 }

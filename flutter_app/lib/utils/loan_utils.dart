@@ -8,6 +8,24 @@ import '../models/payment.dart';
 import '../models/payment_allocation.dart';
 import '../models/schedule_installment.dart';
 
+class DashboardMetrics {
+  final double collectionRate;
+  final double portfolioAtRisk;
+  final double todaysCollections;
+  final double dueThisWeek;
+  final double totalPenalties;
+  final int activeBorrowersCount;
+
+  DashboardMetrics({
+    required this.collectionRate,
+    required this.portfolioAtRisk,
+    required this.todaysCollections,
+    required this.dueThisWeek,
+    required this.totalPenalties,
+    required this.activeBorrowersCount,
+  });
+}
+
 class LoanStats {
   final double totalDisbursed;
   final double totalScheduled;
@@ -666,6 +684,75 @@ class LoanUtils {
       progressPct: progressPct,
       nextDue: nextDue,
       scheduleWithStatus: scheduleWithStatus,
+    );
+  }
+
+  static DashboardMetrics computeDashboardMetrics(List<Loan> loans, [DateTime? refDate]) {
+    final now = refDate ?? DateTime.now();
+    final todayStr = DateFormat('yyyy-MM-dd').format(now);
+    final todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0, 0);
+    final weekEnd = todayStart.add(const Duration(days: 7, hours: 23, minutes: 59, seconds: 59));
+
+    double totalDisbursed = 0.0;
+    double grandTotalCollected = 0.0;
+    double outstandingBalance = 0.0;
+    double overdueAmount = 0.0;
+    double todaysCollections = 0.0;
+    double dueThisWeek = 0.0;
+    double totalPenalties = 0.0;
+    final Set<String> activeBorrowerIds = {};
+
+    for (final loan in loans) {
+      final stats = getLoanStats(loan, now);
+
+      if (loan.status == 'active') {
+        if (loan.borrowerId.isNotEmpty) {
+          activeBorrowerIds.add(loan.borrowerId);
+        }
+      }
+
+      if (['active', 'completed', 'defaulted'].contains(loan.status)) {
+        totalDisbursed += stats.totalDisbursed;
+        outstandingBalance += stats.outstandingBalance;
+        overdueAmount += stats.overdueAmount;
+        totalPenalties += stats.penaltyAmount;
+      }
+
+      for (final pay in loan.payments) {
+        grandTotalCollected += pay.amount;
+        if (pay.date == todayStr) {
+          todaysCollections += pay.amount;
+        }
+      }
+
+      for (final inst in stats.scheduleWithStatus) {
+        if (inst.status != 'paid') {
+          try {
+            final due = DateTime.parse(inst.dueDate);
+            final dueCutoff = DateTime(due.year, due.month, due.day, 23, 59, 59, 999);
+            if (!dueCutoff.isBefore(todayStart) && !dueCutoff.isAfter(weekEnd)) {
+              dueThisWeek += inst.remainingAmount;
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    final collectionRate = totalDisbursed > 0
+        ? round2((grandTotalCollected / totalDisbursed) * 100.0)
+        : 0.0;
+
+    final portfolioAtRisk = outstandingBalance > 0
+        ? round2((overdueAmount / outstandingBalance) * 100.0)
+        : 0.0;
+
+    return DashboardMetrics(
+      collectionRate: collectionRate,
+      portfolioAtRisk: portfolioAtRisk,
+      todaysCollections: round2(todaysCollections),
+      dueThisWeek: round2(dueThisWeek),
+      totalPenalties: round2(totalPenalties),
+      activeBorrowersCount: activeBorrowerIds.length,
     );
   }
 

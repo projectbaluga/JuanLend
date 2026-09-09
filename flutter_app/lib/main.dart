@@ -226,6 +226,8 @@ class _MainShellState extends State<MainShell> {
         builder: (s) => DashboardScreen(
           onSelectLoan: (id) => s.setState(() => s._selectedLoanId = id),
           onSelectBorrower: (id) => s.setState(() => s._selectedBorrowerId = id),
+          onViewLoans: () => s._navigateToKey('loans', _getNavDestinations(isSoloMode)),
+          onViewBorrowers: () => s._navigateToKey('borrowers', _getNavDestinations(isSoloMode)),
         ),
       ),
       _NavDestination(
