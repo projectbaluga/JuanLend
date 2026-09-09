@@ -357,7 +357,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // 1. Business / Operator Section
               _BusinessNameSection(
                 initialName: state.businessName,
-                onSave: (newName) => state.setBusinessName(newName),
+                initialCapital: state.capital,
+                onSaveName: (newName) => state.setBusinessName(newName),
+                onSaveCapital: (newCapital) => state.setCapital(newCapital),
               ),
 
               const SizedBox(height: 16),
@@ -811,33 +813,52 @@ class _FullFeaturesSectionState extends State<_FullFeaturesSection> {
 
 class _BusinessNameSection extends StatefulWidget {
   final String initialName;
-  final ValueChanged<String> onSave;
+  final double initialCapital;
+  final ValueChanged<String> onSaveName;
+  final ValueChanged<double> onSaveCapital;
 
-  const _BusinessNameSection({required this.initialName, required this.onSave});
+  const _BusinessNameSection({
+    required this.initialName,
+    required this.initialCapital,
+    required this.onSaveName,
+    required this.onSaveCapital,
+  });
 
   @override
   State<_BusinessNameSection> createState() => _BusinessNameSectionState();
 }
 
 class _BusinessNameSectionState extends State<_BusinessNameSection> {
-  late final TextEditingController _controller;
+  late final TextEditingController _nameController;
+  late final TextEditingController _capitalController;
 
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.initialName);
+    _nameController = TextEditingController(text: widget.initialName);
+    _capitalController = TextEditingController(
+      text: widget.initialCapital > 0 ? widget.initialCapital.toStringAsFixed(2) : '',
+    );
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _nameController.dispose();
+    _capitalController.dispose();
     super.dispose();
   }
 
-  void _save() {
-    final val = _controller.text.trim();
+  void _saveName() {
+    final val = _nameController.text.trim();
     if (val.isNotEmpty && val != widget.initialName) {
-      widget.onSave(val);
+      widget.onSaveName(val);
+    }
+  }
+
+  void _saveCapital() {
+    final val = double.tryParse(_capitalController.text.trim()) ?? 0.0;
+    if (val != widget.initialCapital) {
+      widget.onSaveCapital(val);
     }
   }
 
@@ -857,17 +878,49 @@ class _BusinessNameSectionState extends State<_BusinessNameSection> {
                 width: 180,
                 child: Focus(
                   onFocusChange: (hasFocus) {
-                    if (!hasFocus) _save();
+                    if (!hasFocus) _saveName();
                   },
                   child: TextField(
-                    controller: _controller,
+                    controller: _nameController,
                     decoration: const InputDecoration(
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                       border: OutlineInputBorder(),
                     ),
-                    onEditingComplete: _save,
-                    onSubmitted: (_) => _save(),
+                    onEditingComplete: _saveName,
+                    onSubmitted: (_) => _saveName(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text('Capital / Puhunan', style: TextStyle(fontSize: 13)),
+                  Text('Starting cash fund', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                ],
+              ),
+              SizedBox(
+                width: 180,
+                child: Focus(
+                  onFocusChange: (hasFocus) {
+                    if (!hasFocus) _saveCapital();
+                  },
+                  child: TextField(
+                    controller: _capitalController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      border: OutlineInputBorder(),
+                    ),
+                    onEditingComplete: _saveCapital,
+                    onSubmitted: (_) => _saveCapital(),
                   ),
                 ),
               ),

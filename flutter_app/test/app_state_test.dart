@@ -309,6 +309,18 @@ void main() {
       expect(appState.appName, equals(appState.businessName));
     });
 
+    test('AppState capital property defaults to 0.0 and persists via setCapital', () async {
+      expect(appState.capital, 0.0);
+
+      await appState.setCapital(150000.0);
+      expect(appState.capital, 150000.0);
+      expect(store.getSetting('capital', '0.0'), '150000.0');
+
+      // Re-instantiate AppState to verify re-hydration from store
+      final rehydrated = AppState(store);
+      expect(rehydrated.capital, 150000.0);
+    });
+
     test('reload re-hydrates preferences and notifies listeners', () async {
       bool notified = false;
       appState.addListener(() => notified = true);
