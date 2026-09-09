@@ -1,3 +1,4 @@
+import 'credit_application.dart';
 import 'credit_assessment.dart';
 import 'payment.dart';
 import 'schedule_installment.dart';
@@ -32,6 +33,7 @@ class Loan {
   final CreditAssessment? creditAssessment;
   final List<ScheduleInstallment> schedule;
   final List<Payment> payments;
+  final List<CreditApplication> creditApplications;
   final String notes;
   final String? createdBy;
   final String? createdAt;
@@ -67,11 +69,13 @@ class Loan {
     this.creditAssessment,
     required this.schedule,
     required this.payments,
+    List<CreditApplication>? creditApplications,
     required this.notes,
     this.createdBy,
     this.createdAt,
     this.updatedAt,
-  }) : termCount = termCount ?? termMonths;
+  })  : creditApplications = creditApplications ?? [],
+        termCount = termCount ?? termMonths;
 
   factory Loan.fromMap(Map<String, dynamic> map) {
     final termM = (map['term_months'] as num?)?.toInt() ?? (map['termMonths'] as num?)?.toInt() ?? 1;
@@ -113,6 +117,11 @@ class Loan {
       payments: map['payments'] != null
           ? (map['payments'] as List).map((e) => Payment.fromMap(Map<String, dynamic>.from(e))).toList()
           : [],
+      creditApplications: map['credit_applications'] != null
+          ? (map['credit_applications'] as List).map((e) => CreditApplication.fromMap(Map<String, dynamic>.from(e))).toList()
+          : (map['creditApplications'] != null
+              ? (map['creditApplications'] as List).map((e) => CreditApplication.fromMap(Map<String, dynamic>.from(e))).toList()
+              : []),
       notes: map['notes']?.toString() ?? '',
       createdBy: map['created_by']?.toString() ?? map['createdBy']?.toString(),
       createdAt: map['createdAt']?.toString(),
@@ -151,6 +160,7 @@ class Loan {
       if (creditAssessment != null) 'credit_assessment': creditAssessment!.toMap(),
       'schedule': schedule.map((e) => e.toMap()).toList(),
       'payments': payments.map((e) => e.toMap()).toList(),
+      'credit_applications': creditApplications.map((e) => e.toMap()).toList(),
       'notes': notes,
       if (createdBy != null) 'created_by': createdBy,
       if (createdAt != null) 'createdAt': createdAt,
@@ -188,6 +198,7 @@ class Loan {
     CreditAssessment? creditAssessment,
     List<ScheduleInstallment>? schedule,
     List<Payment>? payments,
+    List<CreditApplication>? creditApplications,
     String? notes,
     String? createdBy,
     String? createdAt,
@@ -223,6 +234,7 @@ class Loan {
       creditAssessment: creditAssessment ?? this.creditAssessment,
       schedule: schedule ?? this.schedule,
       payments: payments ?? this.payments,
+      creditApplications: creditApplications ?? this.creditApplications,
       notes: notes ?? this.notes,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,

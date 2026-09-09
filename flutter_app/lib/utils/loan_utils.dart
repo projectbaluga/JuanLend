@@ -1,11 +1,30 @@
 import 'dart:math';
 import 'package:intl/intl.dart';
 import '../models/borrower.dart';
+import '../models/credit_application.dart';
 import '../models/credit_assessment.dart';
 import '../models/loan.dart';
 import '../models/payment.dart';
 import '../models/payment_allocation.dart';
 import '../models/schedule_installment.dart';
+
+class DashboardMetrics {
+  final double collectionRate;
+  final double portfolioAtRisk;
+  final double todaysCollections;
+  final double dueThisWeek;
+  final double totalPenalties;
+  final int activeBorrowersCount;
+
+  DashboardMetrics({
+    required this.collectionRate,
+    required this.portfolioAtRisk,
+    required this.todaysCollections,
+    required this.dueThisWeek,
+    required this.totalPenalties,
+    required this.activeBorrowersCount,
+  });
+}
 
 class LoanStats {
   final double totalDisbursed;
@@ -16,6 +35,7 @@ class LoanStats {
   final double penaltyAmount;
   final double totalDueWithPenalty;
   final double creditBalance;
+  final double heldCredit;
   final double payoffAmount;
   final int progressPct;
   final ScheduleInstallment? nextDue;
@@ -30,6 +50,7 @@ class LoanStats {
     required this.penaltyAmount,
     required this.totalDueWithPenalty,
     this.creditBalance = 0.0,
+    this.heldCredit = 0.0,
     required this.payoffAmount,
     required this.progressPct,
     this.nextDue,
@@ -275,17 +296,18 @@ class LoanUtils {
     List<ScheduleInstallment> schedule,
     List<Payment> payments, {
     double penaltyAmount = 0.0,
+    DateTime? referenceDate,
   }) {
     final Map<String, PaymentAllocation> allocations = {};
 
-    // Clone schedule installment tracking
-    final List<Map<String, double>> instTrackers = schedule.map((inst) {
+    final List<Map<String, dynamic>> instTrackers = schedule.map((inst) {
       return {
-        'no': inst.installmentNo.toDouble(),
+        'no': inst.installmentNo,
         'amount': inst.amount,
         'prinRemaining': inst.principal,
         'intRemaining': inst.interest,
         'totalRemaining': inst.amount,
+        'dueDate': inst.dueDate,
       };
     }).toList();
 
@@ -299,6 +321,14 @@ class LoanUtils {
       double excess = 0.0;
       final List<int> coveredNos = [];
 
+      DateTime payDate;
+      try {
+        payDate = DateTime.parse(payment.date);
+      } catch (_) {
+        payDate = referenceDate ?? DateTime.now();
+      }
+      final payCutoff = DateTime(payDate.year, payDate.month, payDate.day, 23, 59, 59, 999);
+
       // 1. First satisfy accrued penalty if any
       if (remainingPenaltyDue > kPaymentEpsilon && remainingPay > kPaymentEpsilon) {
         final penApplicable = min(remainingPay, remainingPenaltyDue);
@@ -307,30 +337,51 @@ class LoanUtils {
         remainingPay = max(0.0, remainingPay - penApplicable);
       }
 
-      // 2. Next satisfy schedule installments sequentially
+      // 2. Determine auto-eligible installments relative to THIS payment's date
+      // An installment is auto-eligible if its due date is <= payment.date
+      // OR if it is the first unpaid installment in the schedule (the currently active due installment).
+      int? firstUnpaidNo;
+      for (final tr in instTrackers) {
+        if ((tr['totalRemaining'] as double) > kPaymentEpsilon) {
+          firstUnpaidNo = tr['no'] as int;
+          break;
+        }
+      }
+
       for (final tracker in instTrackers) {
         if (remainingPay <= kPaymentEpsilon) break;
 
-        final instRem = tracker['totalRemaining']!;
+        final instNo = tracker['no'] as int;
+        final instRem = tracker['totalRemaining'] as double;
         if (instRem <= kPaymentEpsilon) continue;
 
-        final instNo = tracker['no']!.toInt();
+        bool isEligible = false;
+        try {
+          final due = DateTime.parse(tracker['dueDate'] as String);
+          final dueCutoff = DateTime(due.year, due.month, due.day, 23, 59, 59, 999);
+          if (!dueCutoff.isAfter(payCutoff) || instNo == firstUnpaidNo) {
+            isEligible = true;
+          }
+        } catch (_) {
+          isEligible = true;
+        }
+
+        if (!isEligible) continue;
+
         final payToInst = min(remainingPay, instRem);
 
         if (!coveredNos.contains(instNo)) {
           coveredNos.add(instNo);
         }
 
-        // Split payToInst proportionally or interest-first / principal-first
-        final instTotalAmount = tracker['amount']!;
+        final instTotalAmount = tracker['amount'] as double;
         double instPrin = 0.0;
         double instInt = 0.0;
 
         if (instTotalAmount > kPaymentEpsilon) {
-          final intRem = tracker['intRemaining']!;
-          final prinRem = tracker['prinRemaining']!;
+          final intRem = tracker['intRemaining'] as double;
+          final prinRem = tracker['prinRemaining'] as double;
 
-          // Apply to interest first then principal
           final intToPay = min(payToInst, intRem);
           instInt = intToPay;
           tracker['intRemaining'] = max(0.0, intRem - intToPay);
@@ -342,11 +393,11 @@ class LoanUtils {
 
         prinPaid += instPrin;
         intPaid += instInt;
-        tracker['totalRemaining'] = max(0.0, tracker['totalRemaining']! - payToInst);
+        tracker['totalRemaining'] = max(0.0, (tracker['totalRemaining'] as double) - payToInst);
         remainingPay = max(0.0, remainingPay - payToInst);
       }
 
-      // 3. Any remaining payment is excess / overpayment
+      // 3. Any remaining payment is excess / held credit
       if (remainingPay > kPaymentEpsilon) {
         excess = round2(remainingPay);
       }
@@ -372,24 +423,87 @@ class LoanUtils {
     List<Payment> payments, [
     String loanStatus = 'active',
     DateTime? referenceDate,
+    List<CreditApplication>? creditApplications,
   ]) {
     final refDate = referenceDate ?? DateTime.now();
-    final cutoffDate = DateTime(refDate.year, refDate.month, refDate.day, 23, 59, 59, 999);
 
-    double availablePayment = payments.fold(0.0, (sum, p) => sum + p.amount);
+    final Map<int, double> creditAppliedByInst = {};
+    if (creditApplications != null) {
+      for (var ca in creditApplications) {
+        creditAppliedByInst[ca.appliedToInstallmentNo] =
+            (creditAppliedByInst[ca.appliedToInstallmentNo] ?? 0.0) + ca.amount;
+      }
+    }
 
-    return schedule.map((inst) {
+    final List<double> autoPaidAmounts = List.filled(schedule.length, 0.0);
+    final List<Map<String, dynamic>> instTrackers = schedule.map((inst) {
+      return {
+        'no': inst.installmentNo,
+        'amount': inst.amount,
+        'remaining': inst.amount,
+        'dueDate': inst.dueDate,
+      };
+    }).toList();
+
+    for (final payment in payments) {
+      double remainingPay = payment.amount;
+
+      DateTime payDate;
+      try {
+        payDate = DateTime.parse(payment.date);
+      } catch (_) {
+        payDate = refDate;
+      }
+      final payCutoff = DateTime(payDate.year, payDate.month, payDate.day, 23, 59, 59, 999);
+
+      int? firstUnpaidNo;
+      for (final tr in instTrackers) {
+        if ((tr['remaining'] as double) > kPaymentEpsilon) {
+          firstUnpaidNo = tr['no'] as int;
+          break;
+        }
+      }
+
+      for (int i = 0; i < instTrackers.length; i++) {
+        if (remainingPay <= kPaymentEpsilon) break;
+
+        final tracker = instTrackers[i];
+        final instNo = tracker['no'] as int;
+        final instRem = tracker['remaining'] as double;
+        if (instRem <= kPaymentEpsilon) continue;
+
+        bool isEligible = false;
+        try {
+          final due = DateTime.parse(tracker['dueDate'] as String);
+          final dueCutoff = DateTime(due.year, due.month, due.day, 23, 59, 59, 999);
+          if (!dueCutoff.isAfter(payCutoff) || instNo == firstUnpaidNo) {
+            isEligible = true;
+          }
+        } catch (_) {
+          isEligible = true;
+        }
+
+        if (!isEligible) continue;
+
+        final payToInst = min(remainingPay, instRem);
+        autoPaidAmounts[i] += payToInst;
+        tracker['remaining'] = max(0.0, instRem - payToInst);
+        remainingPay = max(0.0, remainingPay - payToInst);
+      }
+    }
+
+    return schedule.asMap().entries.map((entry) {
+      final idx = entry.key;
+      final inst = entry.value;
       final instAmount = inst.amount;
-      double paidAmount = 0.0;
-      String status = 'pending';
+      final creditApplied = creditAppliedByInst[inst.installmentNo] ?? 0.0;
+      double paidAmount = round2(autoPaidAmounts[idx] + creditApplied);
 
-      if (availablePayment >= instAmount - kPaymentEpsilon) {
+      String status = 'pending';
+      if (paidAmount >= instAmount - kPaymentEpsilon) {
         paidAmount = instAmount;
-        availablePayment = max(0.0, availablePayment - instAmount);
         status = 'paid';
-      } else if (availablePayment > kPaymentEpsilon) {
-        paidAmount = availablePayment;
-        availablePayment = 0.0;
+      } else if (paidAmount > kPaymentEpsilon) {
         status = 'partial';
       } else {
         paidAmount = 0.0;
@@ -399,7 +513,7 @@ class LoanUtils {
         try {
           final due = DateTime.parse(inst.dueDate);
           final dueCutoff = DateTime(due.year, due.month, due.day, 23, 59, 59, 999);
-          if (dueCutoff.isBefore(cutoffDate)) {
+          if (dueCutoff.isBefore(refDate)) {
             status = 'overdue';
           }
         } catch (_) {}
@@ -493,13 +607,15 @@ class LoanUtils {
   static LoanStats getLoanStats(Loan loan, [DateTime? referenceDate]) {
     final payments = loan.payments;
     final schedule = loan.schedule;
+    final creditApplications = loan.creditApplications;
 
     final totalPaid = payments.fold(0.0, (sum, p) => sum + p.amount);
+    final totalCreditApplied = creditApplications.fold(0.0, (sum, ca) => sum + ca.amount);
     final totalScheduled = schedule.fold(0.0, (sum, s) => sum + s.amount) > 0
         ? schedule.fold(0.0, (sum, s) => sum + s.amount)
         : loan.principal;
 
-    final scheduleWithStatus = getScheduleWithStatus(schedule, payments, loan.status, referenceDate);
+    final scheduleWithStatus = getScheduleWithStatus(schedule, payments, loan.status, referenceDate, creditApplications);
 
     final outstandingBalance = scheduleWithStatus.fold(0.0, (sum, inst) => sum + inst.remainingAmount);
 
@@ -508,7 +624,7 @@ class LoanUtils {
         .fold(0.0, (sum, inst) => sum + inst.remainingAmount);
 
     final progressPct = totalScheduled > 0
-        ? min(100, ((totalPaid / totalScheduled) * 100).round())
+        ? min(100, (((totalPaid + totalCreditApplied) / totalScheduled) * 100).round())
         : 0;
 
     ScheduleInstallment? nextDue;
@@ -529,6 +645,29 @@ class LoanUtils {
     final totalRequired = round2(totalScheduled + penaltyAmount);
     final creditBalance = totalPaid > totalRequired ? round2(totalPaid - totalRequired) : 0.0;
 
+    // Held credit = total payments received minus (auto-allocated payments to due installments + penalty paid) minus total credit manually applied
+    final Map<int, double> creditAppliedByInst = {};
+    for (var ca in creditApplications) {
+      creditAppliedByInst[ca.appliedToInstallmentNo] =
+          (creditAppliedByInst[ca.appliedToInstallmentNo] ?? 0.0) + ca.amount;
+    }
+
+    double totalAutoAllocated = 0.0;
+    for (var inst in scheduleWithStatus) {
+      final caAmt = creditAppliedByInst[inst.installmentNo] ?? 0.0;
+      final autoAmt = max(0.0, inst.paidAmount - caAmt);
+      totalAutoAllocated += autoAmt;
+    }
+
+    // Determine how much penalty was paid from payments
+    double remainingPayForPen = totalPaid - totalAutoAllocated;
+    double penaltyPaidFromPayments = min(max(0.0, remainingPayForPen), penaltyAmount);
+
+    final heldCredit = max(
+      0.0,
+      round2(totalPaid - totalAutoAllocated - penaltyPaidFromPayments - totalCreditApplied),
+    );
+
     double payoff = totalDueWithPenalty;
 
     return LoanStats(
@@ -540,10 +679,80 @@ class LoanUtils {
       penaltyAmount: penaltyAmount,
       totalDueWithPenalty: totalDueWithPenalty,
       creditBalance: creditBalance,
+      heldCredit: heldCredit,
       payoffAmount: payoff,
       progressPct: progressPct,
       nextDue: nextDue,
       scheduleWithStatus: scheduleWithStatus,
+    );
+  }
+
+  static DashboardMetrics computeDashboardMetrics(List<Loan> loans, [DateTime? refDate]) {
+    final now = refDate ?? DateTime.now();
+    final todayStr = DateFormat('yyyy-MM-dd').format(now);
+    final todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0, 0);
+    final weekEnd = todayStart.add(const Duration(days: 7, hours: 23, minutes: 59, seconds: 59));
+
+    double totalDisbursed = 0.0;
+    double grandTotalCollected = 0.0;
+    double outstandingBalance = 0.0;
+    double overdueAmount = 0.0;
+    double todaysCollections = 0.0;
+    double dueThisWeek = 0.0;
+    double totalPenalties = 0.0;
+    final Set<String> activeBorrowerIds = {};
+
+    for (final loan in loans) {
+      final stats = getLoanStats(loan, now);
+
+      if (loan.status == 'active') {
+        if (loan.borrowerId.isNotEmpty) {
+          activeBorrowerIds.add(loan.borrowerId);
+        }
+      }
+
+      if (['active', 'completed', 'defaulted'].contains(loan.status)) {
+        totalDisbursed += stats.totalDisbursed;
+        outstandingBalance += stats.outstandingBalance;
+        overdueAmount += stats.overdueAmount;
+        totalPenalties += stats.penaltyAmount;
+      }
+
+      for (final pay in loan.payments) {
+        grandTotalCollected += pay.amount;
+        if (pay.date == todayStr) {
+          todaysCollections += pay.amount;
+        }
+      }
+
+      for (final inst in stats.scheduleWithStatus) {
+        if (inst.status != 'paid') {
+          try {
+            final due = DateTime.parse(inst.dueDate);
+            final dueCutoff = DateTime(due.year, due.month, due.day, 23, 59, 59, 999);
+            if (!dueCutoff.isBefore(todayStart) && !dueCutoff.isAfter(weekEnd)) {
+              dueThisWeek += inst.remainingAmount;
+            }
+          } catch (_) {}
+        }
+      }
+    }
+
+    final collectionRate = totalDisbursed > 0
+        ? round2((grandTotalCollected / totalDisbursed) * 100.0)
+        : 0.0;
+
+    final portfolioAtRisk = outstandingBalance > 0
+        ? round2((overdueAmount / outstandingBalance) * 100.0)
+        : 0.0;
+
+    return DashboardMetrics(
+      collectionRate: collectionRate,
+      portfolioAtRisk: portfolioAtRisk,
+      todaysCollections: round2(todaysCollections),
+      dueThisWeek: round2(dueThisWeek),
+      totalPenalties: round2(totalPenalties),
+      activeBorrowersCount: activeBorrowerIds.length,
     );
   }
 

@@ -130,20 +130,20 @@ void main() {
         ScheduleInstallment(installmentNo: 1, dueDate: '2025-02-01', amount: 100.0, principal: 90.0, interest: 10.0, balance: 900.0),
         ScheduleInstallment(installmentNo: 2, dueDate: '2025-03-01', amount: 100.0, principal: 91.0, interest: 9.0, balance: 809.0),
       ];
-      final payments = [Payment(id: 'p1', date: '2025-01-10', amount: 150.0, method: 'Cash', note: '')];
-      final result = LoanUtils.getScheduleWithStatus(schedule, payments, 'active', DateTime.parse('2025-01-15'));
+      final payments = [Payment(id: 'p1', date: '2025-02-01', amount: 150.0, method: 'Cash', note: '')];
+      final result = LoanUtils.getScheduleWithStatus(schedule, payments, 'active', DateTime.parse('2025-02-01'));
 
       expect(result[0].status, 'paid');
       expect(result[0].paidAmount, 100.0);
-      expect(result[1].status, 'partial');
-      expect(result[1].paidAmount, 50.0);
-      expect(result[1].remainingAmount, 50.0);
+      expect(result[1].status, 'pending');
+      expect(result[1].paidAmount, 0.0);
+      expect(result[1].remainingAmount, 100.0);
     });
 
     test('LoanUtils.getScheduleWithStatus handles floating point residue with epsilon tolerance', () {
       final schedule = [
-        ScheduleInstallment(installmentNo: 1, dueDate: '2099-01-01', amount: 958.33, principal: 900.0, interest: 58.33, balance: 1916.67),
-        ScheduleInstallment(installmentNo: 2, dueDate: '2099-02-01', amount: 958.33, principal: 900.0, interest: 58.33, balance: 1016.67),
+        ScheduleInstallment(installmentNo: 1, dueDate: '2025-01-01', amount: 958.33, principal: 900.0, interest: 58.33, balance: 1916.67),
+        ScheduleInstallment(installmentNo: 2, dueDate: '2025-01-02', amount: 958.33, principal: 900.0, interest: 58.33, balance: 1016.67),
         ScheduleInstallment(installmentNo: 3, dueDate: '2099-03-01', amount: 958.34, principal: 900.0, interest: 58.34, balance: 0.0),
       ];
 

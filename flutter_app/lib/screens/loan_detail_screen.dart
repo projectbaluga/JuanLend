@@ -256,7 +256,26 @@ class LoanDetailScreen extends StatelessWidget {
                   TextField(
                     controller: dateCtrl,
                     enabled: !isSaving,
-                    decoration: const InputDecoration(labelText: 'Payment Date (YYYY-MM-DD)', border: OutlineInputBorder()),
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Payment Date',
+                      suffixIcon: Icon(Icons.calendar_today, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
+                    onTap: isSaving
+                        ? null
+                        : () async {
+                            final current = DateTime.tryParse(dateCtrl.text.trim()) ?? DateTime.now();
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: current,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              dateCtrl.text = picked.toIso8601String().split('T')[0];
+                            }
+                          },
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -343,6 +362,199 @@ class LoanDetailScreen extends StatelessWidget {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : const Text('Save & View Receipt'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showApplyCreditDialog(
+    BuildContext context,
+    Loan loan,
+    AppState state,
+  ) {
+    final stats = LoanUtils.getLoanStats(loan);
+    final heldCredit = stats.heldCredit;
+
+    final unpaidInsts = stats.scheduleWithStatus.where((s) => s.status != 'paid').toList();
+    if (unpaidInsts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No unpaid installments remaining.')),
+      );
+      return;
+    }
+
+    int selectedInstNo = unpaidInsts.first.installmentNo;
+    final selectedInst = unpaidInsts.first;
+    final amountCtrl = TextEditingController(text: min(heldCredit, selectedInst.remainingAmount).toStringAsFixed(2));
+    final dateCtrl = TextEditingController(text: DateTime.now().toIso8601String().split('T')[0]);
+
+    bool isSaving = false;
+    String? errorMessage;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final targetInst = unpaidInsts.firstWhere(
+              (i) => i.installmentNo == selectedInstNo,
+              orElse: () => unpaidInsts.first,
+            );
+
+            return Padding(
+              padding: EdgeInsets.only(
+                top: 16,
+                left: 16,
+                right: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Apply Held Credit', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Available Held Credit: ${LoanUtils.formatCurrency(heldCredit, state.currencyCode)}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF059669), fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: selectedInstNo,
+                    decoration: const InputDecoration(labelText: 'Target Installment', border: OutlineInputBorder()),
+                    items: unpaidInsts.map((inst) {
+                      return DropdownMenuItem<int>(
+                        value: inst.installmentNo,
+                        child: Text(
+                          '#${inst.installmentNo} • Due ${LoanUtils.formatDate(inst.dueDate)} (${LoanUtils.formatCurrency(inst.remainingAmount, state.currencyCode)} remaining)',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: isSaving
+                        ? null
+                        : (val) {
+                            if (val != null) {
+                              setModalState(() {
+                                selectedInstNo = val;
+                                final newTarget = unpaidInsts.firstWhere((i) => i.installmentNo == val);
+                                amountCtrl.text = min(heldCredit, newTarget.remainingAmount).toStringAsFixed(2);
+                              });
+                            }
+                          },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: amountCtrl,
+                    enabled: !isSaving,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Amount to Apply *',
+                      helperText: 'Max available: ${LoanUtils.formatCurrency(min(heldCredit, targetInst.remainingAmount), state.currencyCode)}',
+                      errorText: errorMessage,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (_) {
+                      if (errorMessage != null) {
+                        setModalState(() {
+                          errorMessage = null;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: dateCtrl,
+                    enabled: !isSaving,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Applied-On Date',
+                      suffixIcon: Icon(Icons.calendar_today, size: 18),
+                      border: OutlineInputBorder(),
+                    ),
+                    onTap: isSaving
+                        ? null
+                        : () async {
+                            final current = DateTime.tryParse(dateCtrl.text.trim()) ?? DateTime.now();
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: current,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              dateCtrl.text = picked.toIso8601String().split('T')[0];
+                            }
+                          },
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF059669)),
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                final amt = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
+                                if (amt <= 0) {
+                                  setModalState(() {
+                                    errorMessage = 'Please enter an amount greater than 0';
+                                  });
+                                  return;
+                                }
+
+                                if (amt > heldCredit + 0.001) {
+                                  setModalState(() {
+                                    errorMessage = 'Amount exceeds available held credit (${LoanUtils.formatCurrency(heldCredit, state.currencyCode)})';
+                                  });
+                                  return;
+                                }
+
+                                setModalState(() {
+                                  isSaving = true;
+                                  errorMessage = null;
+                                });
+
+                                try {
+                                  await state.applyCredit(
+                                    loan.id,
+                                    installmentNo: selectedInstNo,
+                                    amount: amt,
+                                    date: dateCtrl.text.trim(),
+                                  );
+
+                                  if (!ctx.mounted) return;
+                                  Navigator.pop(ctx);
+
+                                  if (!context.mounted) return;
+                                  HapticFeedback.lightImpact();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Applied ${LoanUtils.formatCurrency(amt, state.currencyCode)} credit to installment #$selectedInstNo')),
+                                  );
+                                } catch (e) {
+                                  setModalState(() {
+                                    isSaving = false;
+                                    errorMessage = e.toString().replaceAll('StateError: ', '').replaceAll('ArgumentError: ', '');
+                                  });
+                                }
+                              },
+                        child: isSaving
+                            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                            : const Text('Apply Credit', style: TextStyle(color: Colors.white)),
                       ),
                     ],
                   ),
@@ -697,6 +909,50 @@ class LoanDetailScreen extends StatelessWidget {
                     Text('Total Due with Penalty: ${LoanUtils.formatCurrency(stats.totalDueWithPenalty, state.currencyCode)}',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.redAccent)),
                   ],
+                  if (stats.heldCredit > 0) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.savings, color: Color(0xFF0284C7), size: 22),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Held Credit Balance: ${LoanUtils.formatCurrency(stats.heldCredit, state.currencyCode)}',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0284C7)),
+                                ),
+                                const Text(
+                                  'Overpayments are held as credit until manually applied to future installments with a specified date.',
+                                  style: TextStyle(fontSize: 10, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isOfficerOrApprover) ...[
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0284C7),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              ),
+                              onPressed: () => _showApplyCreditDialog(context, loan, state),
+                              icon: const Icon(Icons.touch_app, size: 14, color: Colors.white),
+                              label: const Text('Apply Credit', style: TextStyle(fontSize: 11, color: Colors.white)),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                   if (stats.creditBalance > 0) ...[
                     const SizedBox(height: 10),
                     Container(
@@ -875,6 +1131,52 @@ class LoanDetailScreen extends StatelessWidget {
             ),
 
             const SizedBox(height: 16),
+
+            // Credit Applications History Card
+            if (loan.creditApplications.isNotEmpty) ...[
+              CustomCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Credit Application History (${loan.creditApplications.length})',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: loan.creditApplications.length,
+                      separatorBuilder: (_, __) => const Divider(height: 12),
+                      itemBuilder: (context, idx) {
+                        final ca = loan.creditApplications[idx];
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Applied ${LoanUtils.formatCurrency(ca.amount, state.currencyCode)} → Installment #${ca.appliedToInstallmentNo}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0284C7)),
+                                ),
+                                Text(
+                                  'Applied by ${ca.appliedBy}',
+                                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                            Text(
+                              LoanUtils.formatDate(ca.date),
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
 
             // Payments Log Card
             CustomCard(

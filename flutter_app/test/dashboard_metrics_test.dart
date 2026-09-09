@@ -63,5 +63,48 @@ void main() {
       expect(netProfit, 1000.0);
       expect(capitalBalance, 101000.0);
     });
+
+    test('LoanUtils.computeDashboardMetrics correctly calculates collectionRate, PAR, todaysCollections, and dueThisWeek', () {
+      final refDate = DateTime(2026, 1, 15);
+
+      final schedule1 = LoanUtils.generateSchedule(10000.0, 10.0, 2, '2026-01-01');
+      final loan1 = Loan(
+        id: 'metric_l1',
+        borrowerId: 'b1',
+        principal: 10000.0,
+        interestRate: 10.0,
+        termMonths: 2,
+        purpose: 'Metric Loan 1',
+        status: 'active',
+        disbursementDate: '2026-01-01',
+        schedule: schedule1,
+        payments: [
+          Payment(id: 'p_today_1', date: '2026-01-15', amount: 5500.0, method: 'Cash', note: ''),
+        ],
+        notes: '',
+      );
+
+      final schedule2 = LoanUtils.generateSchedule(5000.0, 10.0, 1, '2025-12-01');
+      final loan2 = Loan(
+        id: 'metric_l2',
+        borrowerId: 'b2',
+        principal: 5000.0,
+        interestRate: 10.0,
+        termMonths: 1,
+        purpose: 'Metric Loan 2 (Overdue)',
+        status: 'active',
+        disbursementDate: '2025-12-01',
+        schedule: schedule2,
+        payments: [],
+        notes: '',
+      );
+
+      final metrics = LoanUtils.computeDashboardMetrics([loan1, loan2], refDate);
+
+      expect(metrics.todaysCollections, 5500.0);
+      expect(metrics.activeBorrowersCount, 2);
+      expect(metrics.collectionRate, greaterThan(0.0));
+      expect(metrics.portfolioAtRisk, greaterThan(0.0));
+    });
   });
 }
