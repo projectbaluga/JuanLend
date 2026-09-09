@@ -130,7 +130,7 @@ void main() {
       expect(receipt, contains('GCash'));
     });
 
-    test('ReceiptUtils generates Truth in Lending Disclosure Statement', () {
+    test('ReceiptUtils generates Loan Summary & Disclosure', () {
       final borrower = Borrower(
         id: 'bor_1',
         fullName: 'Maria Santos',
@@ -172,16 +172,13 @@ void main() {
         currencyCode: 'PHP',
       );
 
-      expect(statement, contains('DISCLOSURE STATEMENT ON LOAN/CREDIT TRANSACTION'));
-      expect(statement, contains('R.A. 3765 / SEC MC 3'));
+      expect(statement, contains('LOAN SUMMARY & DISCLOSURE'));
       expect(statement, contains('Maria Santos'));
       expect(statement, contains('₱10,000.00'));
       expect(statement, contains('Processing Fee:               ₱200.00'));
       expect(statement, contains('Service Fee:                  ₱100.00'));
-      expect(statement, contains('TOTAL ITEMIZED FEES / CHARGES:     ₱300.00'));
+      expect(statement, contains('TOTAL ITEMIZED FEES:               ₱300.00'));
       expect(statement, contains('NET PROCEEDS DISBURSED:            ₱9,700.00'));
-      expect(statement, contains('Effective Interest Rate (EIR):'));
-      expect(statement, contains('Annual Percentage Rate (APR):'));
     });
   });
 }

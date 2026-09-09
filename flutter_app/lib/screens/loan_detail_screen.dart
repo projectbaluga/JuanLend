@@ -291,25 +291,6 @@ class LoanDetailScreen extends StatelessWidget {
     final totalFees = LoanUtils.calculateTotalFeesForLoan(loan);
     final netDisbursed = LoanUtils.calculateNetDisbursedForLoan(loan);
 
-    final monthlyNIR = LoanUtils.computeNominalRate(
-      interestRate: loan.interestRate,
-      interestMethod: loan.interestMethod,
-      repaymentFrequency: loan.repaymentFrequency,
-      termCount: loan.termCount,
-      principal: loan.principal,
-    );
-
-    final monthlyEIR = LoanUtils.computeEffectiveInterestRate(
-      principal: loan.principal,
-      interestRate: loan.interestRate,
-      termCount: loan.termCount,
-      repaymentFrequency: loan.repaymentFrequency,
-      interestMethod: loan.interestMethod,
-      totalFees: totalFees,
-      schedule: loan.schedule,
-    );
-
-    final apr = LoanUtils.computeAPR(effectiveMonthlyRate: monthlyEIR);
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -322,46 +303,23 @@ class LoanDetailScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        final dsText = ReceiptUtils.generateDisclosureStatement(
-                          businessName: state.businessName,
-                          borrower: borrower,
-                          loan: loan,
-                          currencyCode: state.currencyCode,
-                        );
-                        _showTextDialog(
-                          context: context,
-                          title: 'Truth in Lending Disclosure Statement',
-                          textContent: dsText,
-                        );
-                      },
-                      icon: const Icon(Icons.description, size: 16),
-                      label: const Text('Disclosure Statement'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        final soaText = ReceiptUtils.generateStatementOfAccount(
-                          businessName: state.businessName,
-                          borrower: borrower,
-                          loan: loan,
-                          stats: stats,
-                          currencyCode: state.currencyCode,
-                        );
-                        _showTextDialog(
-                          context: context,
-                          title: 'Statement of Account (SOA)',
-                          textContent: soaText,
-                        );
-                      },
-                      icon: const Icon(Icons.receipt_long, size: 16),
-                      label: const Text('Statement of Account'),
-                    ),
-                  ],
+                OutlinedButton.icon(
+                  onPressed: () {
+                    final soaText = ReceiptUtils.generateStatementOfAccount(
+                      businessName: state.businessName,
+                      borrower: borrower,
+                      loan: loan,
+                      stats: stats,
+                      currencyCode: state.currencyCode,
+                    );
+                    _showTextDialog(
+                      context: context,
+                      title: 'Statement of Account (SOA)',
+                      textContent: soaText,
+                    );
+                  },
+                  icon: const Icon(Icons.receipt_long, size: 16),
+                  label: const Text('Statement of Account'),
                 ),
                 Row(
                   children: [
@@ -548,47 +506,6 @@ class LoanDetailScreen extends StatelessWidget {
                   Text(
                     'Principal: ${LoanUtils.formatCurrency(loan.principal, state.currencyCode)} @ ${loan.interestRate}% • ${loan.termCount} ${loan.repaymentFrequency} period(s) (${loan.interestMethod.replaceAll('_', ' ')})',
                     style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 4,
-                    alignment: WrapAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Basic Interest (NIR): ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                          const SizedBox(width: 2),
-                          Tooltip(
-                            message: 'NIR (Nominal Interest Rate) — Base interest rate of the loan, excluding additional fees.',
-                            child: const Icon(Icons.info_outline, size: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('True Monthly Cost (EIR): ${monthlyEIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
-                          const SizedBox(width: 2),
-                          Tooltip(
-                            message: 'EIR (Effective Interest Rate) — True total monthly loan cost, including all fees and interest.',
-                            child: const Icon(Icons.info_outline, size: 12, color: Color(0xFF0284C7)),
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('Annualized Rate (APR): ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF7C3AED))),
-                          const SizedBox(width: 2),
-                          Tooltip(
-                            message: 'APR (Annual Percentage Rate) — Annual equivalent of all loan charges if extended for one year.',
-                            child: const Icon(Icons.info_outline, size: 12, color: Color(0xFF7C3AED)),
-                          ),
-                        ],
-                      ),
-                    ],
                   ),
                   if (totalFees > 0) ...[
                     const SizedBox(height: 6),

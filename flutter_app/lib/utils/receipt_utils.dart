@@ -144,26 +144,6 @@ class ReceiptUtils {
     final totalScheduledInterest = loan.schedule.fold(0.0, (sum, inst) => sum + inst.interest);
     final totalRepayable = loan.schedule.fold(0.0, (sum, inst) => sum + inst.amount);
 
-    final monthlyNIR = LoanUtils.computeNominalRate(
-      interestRate: loan.interestRate,
-      interestMethod: loan.interestMethod,
-      repaymentFrequency: loan.repaymentFrequency,
-      termCount: loan.termCount,
-      principal: loan.principal,
-    );
-
-    final monthlyEIR = LoanUtils.computeEffectiveInterestRate(
-      principal: loan.principal,
-      interestRate: loan.interestRate,
-      termCount: loan.termCount,
-      repaymentFrequency: loan.repaymentFrequency,
-      interestMethod: loan.interestMethod,
-      totalFees: totalFees,
-      schedule: loan.schedule,
-    );
-
-    final apr = LoanUtils.computeAPR(effectiveMonthlyRate: monthlyEIR);
-
     final procFee = LoanUtils.calculateFeeAmount(loan.principal, loan.processingFeeType, loan.processingFeeValue, termCount: loan.termCount, frequency: loan.repaymentFrequency);
     final servFee = LoanUtils.calculateFeeAmount(loan.principal, loan.serviceFeeType, loan.serviceFeeValue, termCount: loan.termCount, frequency: loan.repaymentFrequency);
     final disbFee = LoanUtils.calculateFeeAmount(loan.principal, loan.disbursementFeeType, loan.disbursementFeeValue, termCount: loan.termCount, frequency: loan.repaymentFrequency);
@@ -174,18 +154,17 @@ class ReceiptUtils {
     final buffer = StringBuffer();
 
     buffer.writeln('====================================================');
-    buffer.writeln('  DISCLOSURE STATEMENT ON LOAN/CREDIT TRANSACTION   ');
-    buffer.writeln('        (As Required under R.A. 3765 / SEC MC 3)    ');
+    buffer.writeln('            LOAN SUMMARY & DISCLOSURE               ');
     buffer.writeln('====================================================');
-    buffer.writeln('Lender: ${businessName.isNotEmpty ? businessName.toUpperCase() : "MICROLEND SUITE"}');
+    buffer.writeln('Lender: ${businessName.isNotEmpty ? businessName.toUpperCase() : "JUANLEND"}');
     buffer.writeln('Borrower: ${borrower.fullName}');
     buffer.writeln('Address: ${borrower.address.isNotEmpty ? borrower.address : "N/A"}');
     buffer.writeln('Loan ID: ${loan.id}');
     buffer.writeln('Date: ${LoanUtils.formatDate(loan.disbursementDate)}');
     buffer.writeln('----------------------------------------------------');
-    buffer.writeln('1. LOAN AMOUNT / CASH PRICE:          ${LoanUtils.formatCurrency(loan.principal, cur)}');
+    buffer.writeln('1. LOAN AMOUNT / PRINCIPAL:           ${LoanUtils.formatCurrency(loan.principal, cur)}');
     buffer.writeln('----------------------------------------------------');
-    buffer.writeln('2. ITEMIZED FINANCE CHARGES / FEES:');
+    buffer.writeln('2. ITEMIZED FEES / CHARGES:');
     if (procFee > 0) buffer.writeln('   a. Processing Fee:               ${LoanUtils.formatCurrency(procFee, cur)}');
     if (servFee > 0) buffer.writeln('   b. Service Fee:                  ${LoanUtils.formatCurrency(servFee, cur)}');
     if (disbFee > 0) buffer.writeln('   c. Disbursement Fee:             ${LoanUtils.formatCurrency(disbFee, cur)}');
@@ -194,29 +173,21 @@ class ReceiptUtils {
     if (legacyUpfront > 0) buffer.writeln('   f. Other Upfront Deductions:     ${LoanUtils.formatCurrency(legacyUpfront, cur)}');
     if (totalFees == 0) buffer.writeln('   (No upfront fees or charges applied)');
     buffer.writeln('   -------------------------------------------------');
-    buffer.writeln('   TOTAL ITEMIZED FEES / CHARGES:     ${LoanUtils.formatCurrency(totalFees, cur)}');
+    buffer.writeln('   TOTAL ITEMIZED FEES:               ${LoanUtils.formatCurrency(totalFees, cur)}');
     buffer.writeln('----------------------------------------------------');
     buffer.writeln('3. NET PROCEEDS DISBURSED:            ${LoanUtils.formatCurrency(netDisbursed, cur)}');
     buffer.writeln('----------------------------------------------------');
     buffer.writeln('4. INTEREST & REPAYMENT TERMS:');
-    buffer.writeln('   a. Nominal Interest Rate (NIR):    ${monthlyNIR.toStringAsFixed(2)}% per month');
+    buffer.writeln('   a. Interest Rate:                  ${loan.interestRate}%');
     buffer.writeln('   b. Total Interest Amount:          ${LoanUtils.formatCurrency(totalScheduledInterest, cur)}');
     buffer.writeln('   c. Repayment Frequency:            ${loan.repaymentFrequency.toUpperCase()}');
     buffer.writeln('   d. Number of Installments:         ${loan.termCount}');
     buffer.writeln('   e. Total Amount Repayable:         ${LoanUtils.formatCurrency(totalRepayable, cur)}');
     buffer.writeln('----------------------------------------------------');
-    buffer.writeln('5. EFFECTIVE COST OF CREDIT (R.A. 3765 / SEC MC 3):');
-    buffer.writeln('   a. Effective Interest Rate (EIR):   ${monthlyEIR.toStringAsFixed(2)}% per month');
-    buffer.writeln('   b. Annual Percentage Rate (APR):    ${apr.toStringAsFixed(2)}% per annum');
-    buffer.writeln('----------------------------------------------------');
-    buffer.writeln('6. PENALTY / LATE PAYMENT CHARGES:');
+    buffer.writeln('5. PENALTY / LATE PAYMENT CHARGES:');
     buffer.writeln('   Type: ${loan.penaltyType.replaceAll('_', ' ').toUpperCase()}');
     buffer.writeln('   Rate/Amount: ${loan.penaltyValue} (${loan.penaltyType.contains("percent") ? "%" : cur})');
     buffer.writeln('====================================================');
-    buffer.writeln('I ACKNOWLEDGE RECEIPT OF A COPY OF THIS DISCLOSURE');
-    buffer.writeln('STATEMENT PRIOR TO THE CONSUMMATION OF THE CREDIT');
-    buffer.writeln('TRANSACTION.');
-    buffer.writeln('');
     buffer.writeln('Borrower Signature: ________________________________');
     buffer.writeln('Date: ______________________________________________');
     buffer.writeln('====================================================');
