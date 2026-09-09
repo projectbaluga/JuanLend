@@ -104,6 +104,88 @@ class LoanDetailScreen extends StatelessWidget {
     );
   }
 
+  void _showEditLoanDialog(BuildContext context, Loan loan, AppState state) {
+    final purposeCtrl = TextEditingController(text: loan.purpose);
+    final notesCtrl = TextEditingController(text: loan.notes);
+    final dateCtrl = TextEditingController(text: loan.disbursementDate);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: 16,
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Edit Loan Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: purposeCtrl,
+                decoration: const InputDecoration(labelText: 'Purpose', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: dateCtrl,
+                decoration: const InputDecoration(labelText: 'Disbursement Date (YYYY-MM-DD)', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: notesCtrl,
+                decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () async {
+                      final updates = {
+                        'purpose': purposeCtrl.text.trim().isEmpty ? loan.purpose : purposeCtrl.text.trim(),
+                        'disbursement_date': dateCtrl.text.trim().isEmpty ? loan.disbursementDate : dateCtrl.text.trim(),
+                        'notes': notesCtrl.text.trim(),
+                        'updatedAt': DateTime.now().toIso8601String(),
+                      };
+
+                      try {
+                        await state.updateLoan(loan.id, updates);
+                        if (!ctx.mounted) return;
+                        Navigator.pop(ctx);
+
+                        if (!context.mounted) return;
+                        HapticFeedback.lightImpact();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Loan updated successfully')),
+                        );
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Failed to update loan: $e')),
+                        );
+                      }
+                    },
+                    child: const Text('Save Changes'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showRecordPaymentDialog(
     BuildContext context,
     Loan loan,
@@ -303,23 +385,65 @@ class LoanDetailScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () {
-                    final soaText = ReceiptUtils.generateStatementOfAccount(
-                      businessName: state.businessName,
-                      borrower: borrower,
-                      loan: loan,
-                      stats: stats,
-                      currencyCode: state.currencyCode,
-                    );
-                    _showTextDialog(
-                      context: context,
-                      title: 'Statement of Account (SOA)',
-                      textContent: soaText,
-                    );
-                  },
-                  icon: const Icon(Icons.receipt_long, size: 16),
-                  label: const Text('Statement of Account'),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        final soaText = ReceiptUtils.generateStatementOfAccount(
+                          businessName: state.businessName,
+                          borrower: borrower,
+                          loan: loan,
+                          stats: stats,
+                          currencyCode: state.currencyCode,
+                        );
+                        _showTextDialog(
+                          context: context,
+                          title: 'Statement of Account (SOA)',
+                          textContent: soaText,
+                        );
+                      },
+                      icon: const Icon(Icons.receipt_long, size: 16),
+                      label: const Text('Statement of Account'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _showEditLoanDialog(context, loan, state),
+                      icon: const Icon(Icons.edit, size: 16),
+                      label: const Text('Edit Loan'),
+                    ),
+                    if (isApprover)
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
+                        onPressed: () async {
+                          final confirm = await _showConfirmDialog(
+                            context: context,
+                            title: 'Delete Loan?',
+                            message: 'Are you sure you want to delete this loan? This action cannot be undone.',
+                            confirmText: 'Delete Loan',
+                            confirmColor: Colors.redAccent,
+                          );
+                          if (confirm) {
+                            try {
+                              await state.deleteLoan(loan.id);
+                              if (!context.mounted) return;
+                              HapticFeedback.lightImpact();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Loan deleted successfully')),
+                              );
+                              onBack();
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Delete failed: $e')),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.delete_forever, size: 16),
+                        label: const Text('Delete Loan'),
+                      ),
+                  ],
                 ),
                 Row(
                   children: [
@@ -877,6 +1001,44 @@ class LoanDetailScreen extends StatelessWidget {
                                         if (p.recordedAt.isNotEmpty) ...[
                                           const Divider(height: 10),
                                           Text('Recorded At: ${p.recordedAt}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                        ],
+                                        if (isOfficerOrApprover) ...[
+                                          const SizedBox(height: 8),
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: TextButton.icon(
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: Colors.redAccent,
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              ),
+                                              onPressed: () async {
+                                                final confirm = await _showConfirmDialog(
+                                                  context: context,
+                                                  title: 'Void Payment?',
+                                                  message: 'Are you sure you want to void this payment of ${LoanUtils.formatCurrency(p.amount, state.currencyCode)}? The loan schedule balance will be recalculated.',
+                                                  confirmText: 'Void Payment',
+                                                  confirmColor: Colors.redAccent,
+                                                );
+                                                if (confirm) {
+                                                  try {
+                                                    await state.voidPayment(loan.id, p.id);
+                                                    if (!context.mounted) return;
+                                                    HapticFeedback.lightImpact();
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      const SnackBar(content: Text('Payment voided successfully')),
+                                                    );
+                                                  } catch (e) {
+                                                    if (!context.mounted) return;
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(content: Text('Failed to void payment: $e')),
+                                                    );
+                                                  }
+                                                }
+                                              },
+                                              icon: const Icon(Icons.remove_circle_outline, size: 14),
+                                              label: const Text('Void / Reverse Payment', style: TextStyle(fontSize: 11)),
+                                            ),
+                                          ),
                                         ],
                                       ],
                                     ),

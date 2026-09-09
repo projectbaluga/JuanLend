@@ -26,6 +26,202 @@ class _BorrowersScreenState extends State<BorrowersScreen> {
   String _searchTerm = '';
   String _riskFilter = 'all';
 
+  void _showEditBorrowerDialog(BuildContext context, Borrower borrower) {
+    final nameCtrl = TextEditingController(text: borrower.fullName);
+    final emailCtrl = TextEditingController(text: borrower.email);
+    final phoneCtrl = TextEditingController(text: borrower.phone);
+    final addressCtrl = TextEditingController(text: borrower.address);
+    final idCtrl = TextEditingController(text: borrower.idNumber);
+    final empCtrl = TextEditingController(text: borrower.employment);
+    final incomeCtrl = TextEditingController(text: borrower.monthlyIncome > 0 ? borrower.monthlyIncome.toString() : '');
+    final scoreCtrl = TextEditingController(text: borrower.creditScore.toString());
+    String selectedRisk = borrower.riskRating;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: 16,
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Edit Borrower', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Full Name *', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: emailCtrl,
+                        decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: phoneCtrl,
+                        decoration: const InputDecoration(labelText: 'Phone', border: OutlineInputBorder()),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: idCtrl,
+                        decoration: const InputDecoration(labelText: 'ID Number', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: empCtrl,
+                        decoration: const InputDecoration(labelText: 'Employment', border: OutlineInputBorder()),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: incomeCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Monthly Income', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: scoreCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Credit Score (0-100)', border: OutlineInputBorder()),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedRisk,
+                  decoration: const InputDecoration(labelText: 'Risk Rating', border: OutlineInputBorder()),
+                  items: const [
+                    DropdownMenuItem(value: 'low', child: Text('Low Risk')),
+                    DropdownMenuItem(value: 'medium', child: Text('Medium Risk')),
+                    DropdownMenuItem(value: 'high', child: Text('High Risk')),
+                  ],
+                  onChanged: (val) => selectedRisk = val ?? 'medium',
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: addressCtrl,
+                  decoration: const InputDecoration(labelText: 'Address', border: OutlineInputBorder()),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty) return;
+                        final updates = {
+                          'fullName': nameCtrl.text.trim(),
+                          'email': emailCtrl.text.trim(),
+                          'phone': phoneCtrl.text.trim(),
+                          'address': addressCtrl.text.trim(),
+                          'idNumber': idCtrl.text.trim(),
+                          'employment': empCtrl.text.trim(),
+                          'monthlyIncome': double.tryParse(incomeCtrl.text.trim()) ?? 0.0,
+                          'creditScore': int.tryParse(scoreCtrl.text.trim()) ?? 50,
+                          'riskRating': selectedRisk,
+                        };
+
+                        try {
+                          await Provider.of<AppState>(context, listen: false).updateBorrower(borrower.id, updates);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+
+                          if (!context.mounted) return;
+                          HapticFeedback.lightImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Borrower updated successfully')),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to update borrower: ${e.toString().replaceAll('StateError: ', '')}')),
+                          );
+                        }
+                      },
+                      child: const Text('Update Borrower'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteBorrower(BuildContext context, Borrower borrower) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Delete Borrower?'),
+          content: Text('Are you sure you want to delete "${borrower.fullName}"? This action cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await Provider.of<AppState>(context, listen: false).deleteBorrower(borrower.id);
+                  if (!context.mounted) return;
+                  HapticFeedback.lightImpact();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Borrower deleted successfully')),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete borrower: ${e.toString().replaceAll('StateError: ', '')}')),
+                  );
+                }
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _showAddBorrowerDialog(BuildContext context) {
     final nameCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
@@ -270,6 +466,38 @@ class _BorrowersScreenState extends State<BorrowersScreen> {
                                     ),
                                     const SizedBox(width: 6),
                                     AppBadge(text: assessment.riskRating, variant: assessment.riskRating),
+                                    PopupMenuButton<String>(
+                                      icon: const Icon(Icons.more_vert, size: 18, color: Colors.grey),
+                                      onSelected: (val) {
+                                        if (val == 'edit') {
+                                          _showEditBorrowerDialog(context, b);
+                                        } else if (val == 'delete') {
+                                          _confirmDeleteBorrower(context, b);
+                                        }
+                                      },
+                                      itemBuilder: (ctx) => [
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit, size: 16),
+                                              SizedBox(width: 8),
+                                              Text('Edit Borrower', style: TextStyle(fontSize: 12)),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete, size: 16, color: Colors.redAccent),
+                                              SizedBox(width: 8),
+                                              Text('Delete Borrower', style: TextStyle(fontSize: 12, color: Colors.redAccent)),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
