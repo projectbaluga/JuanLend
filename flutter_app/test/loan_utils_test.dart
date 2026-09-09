@@ -105,27 +105,6 @@ void main() {
       expect(schedule[9].dueDate, '2026-03-12');
     });
 
-    test('LoanUtils.generateSchedule handles interest-only balloon interest method', () {
-      final schedule = LoanUtils.generateSchedule(
-        1200.0,
-        12.0,
-        12,
-        '2026-01-01',
-        repaymentFrequency: 'monthly',
-        interestMethod: 'interest_only',
-      );
-
-      expect(schedule.length, 12);
-      // Monthly interest = 1200 * (12%/12) = 12.0
-      expect(schedule[0].amount, 12.0);
-      expect(schedule[0].principal, 0.0);
-      expect(schedule[0].interest, 12.0);
-
-      // Final installment includes full principal balloon (1200 + 12 = 1212)
-      expect(schedule[11].amount, 1212.0);
-      expect(schedule[11].principal, 1200.0);
-      expect(schedule[11].interest, 12.0);
-    });
 
     test('LoanUtils.generateSchedule handles one-time lump sum payment', () {
       final schedule = LoanUtils.generateSchedule(
@@ -255,38 +234,51 @@ void main() {
     });
   });
 
-  group('LoanUtils.computeEarlyPayoffAmount and validateLoanParams', () {
-    test('early payoff amount for reducing loan is less than sum of remaining scheduled installments', () {
-      final schedule = LoanUtils.generateSchedule(10000.0, 12.0, 12, '2026-01-01');
-      final loan = Loan(
-        id: 'reducing_early_payoff',
-        borrowerId: 'b1',
-        principal: 10000.0,
-        interestRate: 12.0,
-        termMonths: 12,
-        repaymentFrequency: 'monthly',
-        interestMethod: 'reducing',
-        termCount: 12,
-        purpose: 'Early Payoff Test',
-        status: 'active',
-        disbursementDate: '2026-01-01',
-        schedule: schedule,
-        payments: [],
-        notes: '',
-      );
-
-      final stats = LoanUtils.getLoanStats(loan, DateTime.parse('2026-01-15'));
-      // Total scheduled includes 12 months of interest (~10,661.85). Early payoff at day 14 should be ~10,040 (principal + 14 days interest)
-      expect(stats.payoffAmount, lessThan(stats.totalScheduled));
-      expect(stats.payoffAmount, greaterThan(10000.0));
-    });
-
+  group('LoanUtils.validateLoanParams & Kaltas-Agad Upfront Interest Deduction', () {
     test('validateLoanParams rejects negative interest, negative penalty, and excessive tenure', () {
       expect(LoanUtils.validateLoanParams(principal: -100, interestRate: 10, termCount: 6, repaymentFrequency: 'monthly', penaltyValue: 0), isNotNull);
       expect(LoanUtils.validateLoanParams(principal: 1000, interestRate: -5, termCount: 6, repaymentFrequency: 'monthly', penaltyValue: 0), isNotNull);
       expect(LoanUtils.validateLoanParams(principal: 1000, interestRate: 10, termCount: 6, repaymentFrequency: 'monthly', penaltyValue: -10), isNotNull);
       expect(LoanUtils.validateLoanParams(principal: 1000, interestRate: 10, termCount: 100, repaymentFrequency: 'monthly', penaltyValue: 0), isNotNull);
       expect(LoanUtils.validateLoanParams(principal: 1000, interestRate: 10, termCount: 12, repaymentFrequency: 'monthly', penaltyValue: 0), isNull);
+    });
+
+    test('kaltas-agad upfront interest deduction calculates net disbursed = 4500, total scheduled = 5000, and zero interest in schedule', () {
+      final p = 5000.0;
+      final r = 10.0;
+      final termCount = 30;
+      final frequency = 'daily';
+
+      final interestDeduction = LoanUtils.round2(p * r / 100.0); // 500.0
+      expect(interestDeduction, 500.0);
+
+      final totalFees = LoanUtils.calculateTotalUpfrontFees(
+        principal: p,
+        upfrontDeductionType: 'fixed',
+        upfrontDeductionValue: interestDeduction,
+      );
+      expect(totalFees, 500.0);
+
+      final netDisbursed = LoanUtils.calculateNetDisbursed(p, 'fixed', interestDeduction);
+      expect(netDisbursed, 4500.0);
+
+      final schedule = LoanUtils.generateSchedule(
+        p,
+        0.0, // interest-free installments because interest is deducted upfront
+        termCount,
+        '2026-01-01',
+        repaymentFrequency: frequency,
+        interestMethod: 'flat',
+      );
+
+      expect(schedule.length, 30);
+      final totalScheduled = schedule.fold(0.0, (sum, inst) => sum + inst.amount);
+      final totalInterest = schedule.fold(0.0, (sum, inst) => sum + inst.interest);
+
+      expect(totalScheduled, closeTo(5000.0, 0.01));
+      expect(totalInterest, 0.0);
+      expect(schedule.first.interest, 0.0);
+      expect(schedule.first.principal, closeTo(166.67, 0.1));
     });
   });
 

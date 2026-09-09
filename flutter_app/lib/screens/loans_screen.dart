@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -46,8 +47,11 @@ class _LoansScreenState extends State<LoansScreen> {
 
     String selectedBorrowerId = initialBorrowerId ?? borrowers.first.id;
     String selectedFrequency = state.defaultRepaymentFrequency;
-    String selectedMethod = state.defaultInterestMethod;
+    String selectedMethod = (state.defaultInterestMethod == 'flat' || state.defaultInterestMethod == 'one_time')
+        ? state.defaultInterestMethod
+        : 'flat';
     String selectedPenaltyType = state.defaultPenaltyType;
+    bool deductInterestUpfront = false;
 
     final principalCtrl = TextEditingController();
     final rateCtrl = TextEditingController(text: state.defaultInterestRate.toString());
@@ -87,8 +91,12 @@ class _LoansScreenState extends State<LoansScreen> {
             final notaVal = double.tryParse(notarialFeeCtrl.text.trim()) ?? 0.0;
             final insVal = double.tryParse(insuranceFeeCtrl.text.trim()) ?? 0.0;
 
+            final interestDeduction = deductInterestUpfront ? LoanUtils.round2(p * r / 100.0) : 0.0;
+
             final totalFees = LoanUtils.calculateTotalUpfrontFees(
               principal: p,
+              upfrontDeductionType: deductInterestUpfront ? 'fixed' : 'none',
+              upfrontDeductionValue: interestDeduction,
               processingFeeType: processingFeeType,
               processingFeeValue: procVal,
               serviceFeeType: serviceFeeType,
@@ -103,12 +111,14 @@ class _LoansScreenState extends State<LoansScreen> {
               frequency: selectedFrequency,
             );
 
-            final netDisbursed = LoanUtils.round2(p - totalFees);
+            final netDisbursed = LoanUtils.round2(max(0.0, p - totalFees));
+
+            final effectiveRate = deductInterestUpfront ? 0.0 : r;
 
             final schedPreview = (p > 0 && t > 0)
                 ? LoanUtils.generateSchedule(
                     p,
-                    r,
+                    effectiveRate,
                     t,
                     dateCtrl.text.trim(),
                     repaymentFrequency: selectedFrequency,
@@ -287,16 +297,8 @@ class _LoansScreenState extends State<LoansScreen> {
                                                 ),
                                                 items: const [
                                                   DropdownMenuItem(
-                                                    value: 'reducing',
-                                                    child: Text('Reducing Balance — interest shrinks as you pay down the loan (borrower-friendly)', overflow: TextOverflow.ellipsis),
-                                                  ),
-                                                  DropdownMenuItem(
                                                     value: 'flat',
-                                                    child: Text('Flat / Add-on — interest charged on the full amount for the whole term (more expensive)', overflow: TextOverflow.ellipsis),
-                                                  ),
-                                                  DropdownMenuItem(
-                                                    value: 'interest_only',
-                                                    child: Text('Interest-Only — pay interest first, full principal at the end', overflow: TextOverflow.ellipsis),
+                                                    child: Text('Flat / Add-on ("5-6")', overflow: TextOverflow.ellipsis),
                                                   ),
                                                   DropdownMenuItem(
                                                     value: 'one_time',
@@ -308,29 +310,15 @@ class _LoansScreenState extends State<LoansScreen> {
                                                 },
                                               ),
                                             ),
-                                            IconButton(
-                                              icon: const Icon(Icons.info_outline, size: 20, color: Colors.grey),
-                                              tooltip: 'Flat / Add-on interest is computed on the full initial principal for the entire loan term regardless of balance repayments. Reducing balance interest decreases with each repayment.',
-                                              onPressed: () {
-                                                showDialog(
-                                                  context: context,
-                                                  builder: (dialogCtx) => AlertDialog(
-                                                    title: const Text('Interest Calculation Methods'),
-                                                    content: const Text(
-                                                      '• Reducing Balance: Interest is recalculated on the remaining unpaid balance each period (Standard bank, SSS, Pag-IBIG method).\n\n'
-                                                      '• Flat / Add-on: Interest is calculated on the full initial principal across the whole term. This makes the effective borrowing cost significantly higher.',
-                                                    ),
-                                                    actions: [
-                                                      TextButton(
-                                                        onPressed: () => Navigator.pop(dialogCtx),
-                                                        child: const Text('Got it'),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                );
-                                              },
-                                            ),
                                           ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        SwitchListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          title: const Text('Kaltas-agad ang interes (Deduct interest upfront)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                          subtitle: const Text('Ibabawas agad ang interes sa ibibigay na cash; buo pa rin ang principal na babayaran.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                          value: deductInterestUpfront,
+                                          onChanged: (val) => setModalState(() => deductInterestUpfront = val),
                                         ),
                                         const SizedBox(height: 10),
                                         buildFieldPair(
@@ -736,9 +724,12 @@ class _LoansScreenState extends State<LoansScreen> {
                             final bLoans = state.loans.where((l) => l.borrowerId == selectedBorrowerId).toList();
                             final assessment = LoanUtils.assessBorrower(selectedB, bLoans);
 
+                            final effectiveRate = deductInterestUpfront ? 0.0 : r;
+                            final interestDeduction = deductInterestUpfront ? LoanUtils.round2(p * r / 100.0) : 0.0;
+
                             final sched = LoanUtils.generateSchedule(
                               p,
-                              r,
+                              effectiveRate,
                               t,
                               dateCtrl.text.trim(),
                               repaymentFrequency: selectedFrequency,
@@ -757,8 +748,8 @@ class _LoansScreenState extends State<LoansScreen> {
                               purpose: purpose,
                               status: 'pending',
                               disbursementDate: dateCtrl.text.trim(),
-                              upfrontDeductionType: 'none',
-                              upfrontDeductionValue: 0.0,
+                              upfrontDeductionType: deductInterestUpfront ? 'fixed' : 'none',
+                              upfrontDeductionValue: interestDeduction,
                               processingFeeType: processingFeeType,
                               processingFeeValue: procVal,
                               serviceFeeType: serviceFeeType,
