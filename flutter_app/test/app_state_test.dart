@@ -630,6 +630,81 @@ void main() {
       expect(allPayments.first.payment.date.compareTo(allPayments.last.payment.date) >= 0, isTrue);
     });
 
+    test('deleteLoan enforces approver role, deletes loan, and updates store', () async {
+      final loanToDelete = Loan(
+        id: 'loan_to_delete',
+        borrowerId: 'b1',
+        principal: 2000.0,
+        interestRate: 10.0,
+        termMonths: 6,
+        purpose: 'Delete Test',
+        status: 'pending',
+        disbursementDate: '2026-01-01',
+        schedule: [],
+        payments: [],
+        notes: '',
+      );
+      await appState.addLoan(loanToDelete);
+      expect(appState.loans.any((l) => l.id == 'loan_to_delete'), isTrue);
+
+      // Create viewer user
+      await appState.createUser('viewer_del', 'pwd123', 'viewer');
+      await appState.login('viewer_del', 'pwd123');
+
+      // Viewer cannot delete loan
+      expect(() => appState.deleteLoan('loan_to_delete'), throwsStateError);
+
+      // Approver can delete loan
+      await appState.login('admin', 'admin123');
+      await appState.deleteLoan('loan_to_delete');
+
+      expect(appState.loans.any((l) => l.id == 'loan_to_delete'), isFalse);
+    });
+
+    test('voidPayment removes payment, recalculates loan schedule status, and reverts completed status if unpaid', () async {
+      await appState.createUser('officer_void', 'officer123', 'officer');
+      await appState.login('officer_void', 'officer123');
+
+      final schedule = LoanUtils.generateSchedule(1000.0, 10.0, 1, '2026-01-01');
+      final completedLoan = Loan(
+        id: 'loan_to_void_pay',
+        borrowerId: 'b1',
+        principal: 1000.0,
+        interestRate: 10.0,
+        termMonths: 1,
+        purpose: 'Void Payment Test',
+        status: 'active',
+        disbursementDate: '2026-01-01',
+        schedule: schedule,
+        payments: [],
+        notes: '',
+      );
+      await appState.addLoan(completedLoan);
+
+      final fullPay = Payment(
+        id: 'pay_full_1',
+        date: '2026-01-02',
+        amount: 1100.0, // 1000 principal + 100 interest
+        method: 'Cash',
+        note: 'Full Payment',
+      );
+      await appState.recordPayment('loan_to_void_pay', fullPay);
+
+      var updated = appState.loans.firstWhere((l) => l.id == 'loan_to_void_pay');
+      expect(updated.status, 'completed');
+      expect(updated.payments.length, 1);
+
+      // Void payment as officer
+      await appState.voidPayment('loan_to_void_pay', 'pay_full_1');
+
+      updated = appState.loans.firstWhere((l) => l.id == 'loan_to_void_pay');
+      expect(updated.payments.isEmpty, isTrue);
+      expect(updated.status, 'active'); // Reverted from completed back to active
+
+      final stats = LoanUtils.getLoanStats(updated);
+      expect(stats.outstandingBalance, 1100.0);
+    });
+
     test('rolloverLoan and topUpLoan work correctly with permissions and limits', () async {
       await appState.createUser('officer_rt', 'officer123', 'officer');
       await appState.login('officer_rt', 'officer123');

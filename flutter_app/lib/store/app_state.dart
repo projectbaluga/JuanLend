@@ -622,6 +622,51 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteLoan(String id) async {
+    if (_currentUser == null || (!isSoloMode && _currentUser!.role != 'approver')) {
+      throw StateError('Unauthorized: Only approvers can delete loans.');
+    }
+
+    await store.deleteItem('loans', id);
+    notifyListeners();
+  }
+
+  Future<void> voidPayment(String loanId, String paymentId) async {
+    if (_currentUser == null || (_currentUser!.role != 'officer' && _currentUser!.role != 'approver')) {
+      throw StateError('Unauthorized: Role "${_currentUser?.role ?? "unauthenticated"}" cannot void payments.');
+    }
+
+    final existingLoan = loans.firstWhere((l) => l.id == loanId);
+    final updatedPayments = existingLoan.payments.where((p) => p.id != paymentId).toList();
+
+    if (updatedPayments.length == existingLoan.payments.length) {
+      throw ArgumentError('Payment not found.');
+    }
+
+    final updatedLoanMap = {
+      ...existingLoan.toMap(),
+      'payments': updatedPayments.map((p) => p.toMap()).toList(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    };
+
+    final tempLoan = Loan.fromMap(updatedLoanMap);
+    final statsAfter = LoanUtils.getLoanStats(tempLoan);
+
+    final totalRequired = LoanUtils.round2(statsAfter.totalScheduled + statsAfter.penaltyAmount);
+    String newStatus = existingLoan.status;
+    if (existingLoan.status == 'completed' && statsAfter.totalPaid < totalRequired) {
+      newStatus = 'active';
+    }
+
+    await store.updateItem('loans', loanId, {
+      'payments': updatedPayments.map((p) => p.toMap()).toList(),
+      'status': newStatus,
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+
+    notifyListeners();
+  }
+
   Future<void> approveLoan(String loanId, {bool overrideHighRisk = false}) async {
     if (_currentUser == null || (!isSoloMode && _currentUser!.role != 'approver')) {
       throw StateError('Unauthorized: Only approvers can approve loans.');
