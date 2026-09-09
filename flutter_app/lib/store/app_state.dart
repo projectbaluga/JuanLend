@@ -622,9 +622,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> deleteLoan(String id) async {
+  Future<void> deleteLoan(String id, {bool overrideWithPayments = false}) async {
     if (_currentUser == null || (!isSoloMode && _currentUser!.role != 'approver')) {
       throw StateError('Unauthorized: Only approvers can delete loans.');
+    }
+
+    final match = loans.where((l) => l.id == id).toList();
+    if (match.isEmpty) {
+      throw ArgumentError('Loan not found.');
+    }
+
+    final targetLoan = match.first;
+    if (targetLoan.payments.isNotEmpty && !overrideWithPayments) {
+      throw StateError('Cannot delete loan with recorded payments (${targetLoan.payments.length}). Void all payments first or request an explicit override.');
     }
 
     await store.deleteItem('loans', id);
