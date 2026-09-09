@@ -142,126 +142,6 @@ class LoanUtils {
     return round2(max(0.0, loan.principal - totalFees));
   }
 
-  static double computeNominalRate({
-    required double interestRate,
-    required String interestMethod,
-    required String repaymentFrequency,
-    int termCount = 1,
-    double principal = 0.0,
-  }) {
-    if (principal <= 0 && interestMethod == 'flat') return 0.0;
-
-    double monthlyNIR = 0.0;
-    if (interestMethod == 'flat' || interestMethod == 'one_time') {
-      final totalInterest = principal * (interestRate / 100.0);
-      double termMonths = 1.0;
-      switch (repaymentFrequency) {
-        case 'daily':
-          termMonths = termCount / 30.4167;
-          break;
-        case 'weekly':
-          termMonths = termCount / 4.3333;
-          break;
-        case 'biweekly':
-          termMonths = termCount / 2.1667;
-          break;
-        case 'monthly':
-        default:
-          termMonths = termCount.toDouble();
-          break;
-      }
-      if (termMonths <= 0) termMonths = 1.0;
-      monthlyNIR = (totalInterest / principal) / termMonths * 100.0;
-    } else {
-      // 'reducing' or 'interest_only'
-      // interestRate stored in Loan is annual percentage rate (e.g. 12% p.a.)
-      monthlyNIR = interestRate / 12.0;
-    }
-    return round2(max(0.0, monthlyNIR));
-  }
-
-  static double computeEffectiveInterestRate({
-    required double principal,
-    required double interestRate,
-    required int termCount,
-    required String repaymentFrequency,
-    required String interestMethod,
-    double totalFees = 0.0,
-    List<ScheduleInstallment>? schedule,
-  }) {
-    if (principal <= 0) return 0.0;
-
-    final netDisbursed = max(0.01, principal - totalFees);
-    final sched = (schedule != null && schedule.isNotEmpty)
-        ? schedule
-        : generateSchedule(
-            principal,
-            interestRate,
-            termCount,
-            '',
-            repaymentFrequency: repaymentFrequency,
-            interestMethod: interestMethod,
-          );
-
-    if (sched.isEmpty) return 0.0;
-
-    final cashFlows = [ -netDisbursed, ...sched.map((s) => s.amount) ];
-
-    // Solve periodic IRR 'r' using Newton-Raphson
-    double r = 0.05; // Initial guess 5%
-    for (int iter = 0; iter < 100; iter++) {
-      double npv = 0.0;
-      double dnpv = 0.0;
-      for (int t = 0; t < cashFlows.length; t++) {
-        final denom = pow(1 + r, t).toDouble();
-        npv += cashFlows[t] / denom;
-        if (t > 0) {
-          dnpv -= t * cashFlows[t] / (denom * (1 + r));
-        }
-      }
-      if (dnpv.abs() < 1e-10) break;
-      final newR = r - npv / dnpv;
-      if ((newR - r).abs() < 1e-7) {
-        r = newR;
-        break;
-      }
-      r = newR;
-      if (r <= -0.99) {
-        r = -0.9;
-      }
-    }
-
-    if (r.isNaN || r.isInfinite || r < 0) {
-      r = 0.0;
-    }
-
-    // Convert periodic rate 'r' to monthly Effective Interest Rate (EIR % / month)
-    double monthlyEIR = 0.0;
-    switch (repaymentFrequency) {
-      case 'daily':
-        monthlyEIR = (pow(1 + r, 30.4167) - 1) * 100.0;
-        break;
-      case 'weekly':
-        monthlyEIR = (pow(1 + r, 4.3333) - 1) * 100.0;
-        break;
-      case 'biweekly':
-        monthlyEIR = (pow(1 + r, 2.1667) - 1) * 100.0;
-        break;
-      case 'monthly':
-      default:
-        monthlyEIR = r * 100.0;
-        break;
-    }
-
-    return round2(max(0.0, monthlyEIR));
-  }
-
-  static double computeAPR({
-    required double effectiveMonthlyRate,
-  }) {
-    // Annualized percentage rate = monthly EIR * 12
-    return round2(max(0.0, effectiveMonthlyRate * 12.0));
-  }
 
   static String currencySymbol([String? currencyCode]) {
     final code = currencyCode ?? defaultCurrencyCode;
@@ -645,12 +525,7 @@ class LoanUtils {
     final val = max(0.0, loan.penaltyValue);
     final accrued = max(0.0, loan.accruedPenalty);
 
-    // SEC MC 3 s.2022 Total Cost of Credit Cap: Total Interest + Fees + Penalties <= 100% of Principal
-    final totalScheduledInterest = loan.schedule.fold(0.0, (sum, inst) => sum + inst.interest);
-    final totalFees = calculateTotalFeesForLoan(loan);
-    final maxAllowedPenalty = max(0.0, round2(loan.principal - totalScheduledInterest - totalFees));
-
-    if (type == 'none' || val == 0.0) return round2(min(accrued, maxAllowedPenalty));
+    if (type == 'none' || val == 0.0) return round2(accrued);
 
     final overdueInsts = scheduleWithStatus.where((inst) => inst.status == 'overdue').toList();
 
@@ -668,8 +543,7 @@ class LoanUtils {
       }
     }
 
-    final totalPenalty = round2(accrued + newlyIncurred);
-    return round2(min(totalPenalty, maxAllowedPenalty));
+    return round2(accrued + newlyIncurred);
   }
 
   static double computeEarlyPayoffAmount(Loan loan, [DateTime? asOfDate]) {
@@ -715,18 +589,6 @@ class LoanUtils {
     return min(payoff, stats.totalDueWithPenalty);
   }
 
-  static bool isCoveredSmallLoan({
-    required double principal,
-    required int termCount,
-    required String repaymentFrequency,
-    bool isUnsecured = true,
-  }) {
-    if (principal > 10000) return false;
-    final termDays = calculateTermDays(termCount, repaymentFrequency);
-    if (termDays > 120) return false; // 4 months max
-    return isUnsecured;
-  }
-
   static String? validateLoanParams({
     required double principal,
     required double interestRate,
@@ -734,9 +596,7 @@ class LoanUtils {
     required String repaymentFrequency,
     required double penaltyValue,
     String interestMethod = 'reducing',
-    double totalFees = 0.0,
     String penaltyType = 'none',
-    bool enforceCoveredCaps = false,
   }) {
     if (principal <= 0) return 'Principal must be greater than 0.';
     if (principal > 10000000) return 'Principal exceeds maximum allowed limit (₱10,000,000).';
@@ -762,41 +622,6 @@ class LoanUtils {
 
     if (termCount <= 0 || termCount > maxTerms) {
       return 'Term count for $repaymentFrequency frequency must be between 1 and $maxTerms.';
-    }
-
-    final isCovered = enforceCoveredCaps || isCoveredSmallLoan(
-      principal: principal,
-      termCount: termCount,
-      repaymentFrequency: repaymentFrequency,
-    );
-
-    if (isCovered) {
-      final monthlyNIR = computeNominalRate(
-        interestRate: interestRate,
-        interestMethod: interestMethod,
-        repaymentFrequency: repaymentFrequency,
-        termCount: termCount,
-        principal: principal,
-      );
-      if (monthlyNIR > 6.001) {
-        return 'Nominal interest rate (${monthlyNIR.toStringAsFixed(1)}%/mo) exceeds regulatory cap of 6%/month for covered small loans (SEC MC 3 s.2022).';
-      }
-
-      final monthlyEIR = computeEffectiveInterestRate(
-        principal: principal,
-        interestRate: interestRate,
-        termCount: termCount,
-        repaymentFrequency: repaymentFrequency,
-        interestMethod: interestMethod,
-        totalFees: totalFees,
-      );
-      if (monthlyEIR > 15.001) {
-        return 'Effective interest rate (${monthlyEIR.toStringAsFixed(1)}%/mo) exceeds regulatory cap of 15%/month for covered small loans (SEC MC 3 s.2022 / BSP Circular 1133).';
-      }
-
-      if (penaltyType == 'percent_per_period' && penaltyValue > 5.001) {
-        return 'Penalty rate (${penaltyValue.toStringAsFixed(1)}%/mo) exceeds regulatory cap of 5%/month for covered small loans (SEC MC 3 s.2022).';
-      }
     }
 
     return null;

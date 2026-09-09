@@ -68,7 +68,6 @@ class _LoansScreenState extends State<LoansScreen> {
     String insuranceFeeType = 'none';
     final insuranceFeeCtrl = TextEditingController(text: '0');
 
-    bool enforceCoveredCaps = false;
     String? validationError;
 
     showModalBottomSheet(
@@ -117,38 +116,6 @@ class _LoansScreenState extends State<LoansScreen> {
                   )
                 : <ScheduleInstallment>[];
 
-            final monthlyNIR = LoanUtils.computeNominalRate(
-              interestRate: r,
-              interestMethod: selectedMethod,
-              repaymentFrequency: selectedFrequency,
-              termCount: t,
-              principal: p,
-            );
-
-            final monthlyEIR = LoanUtils.computeEffectiveInterestRate(
-              principal: p,
-              interestRate: r,
-              termCount: t,
-              repaymentFrequency: selectedFrequency,
-              interestMethod: selectedMethod,
-              totalFees: totalFees,
-              schedule: schedPreview,
-            );
-
-            final apr = LoanUtils.computeAPR(effectiveMonthlyRate: monthlyEIR);
-
-            final isCovered = enforceCoveredCaps || LoanUtils.isCoveredSmallLoan(
-              principal: p,
-              termCount: t,
-              repaymentFrequency: selectedFrequency,
-            );
-
-            final penVal = double.tryParse(penaltyValueCtrl.text.trim()) ?? 0.0;
-            final capBreached = isCovered && (
-              monthlyNIR > 6.001 ||
-              monthlyEIR > 15.001 ||
-              (selectedPenaltyType == 'percent_per_period' && penVal > 5.001)
-            );
 
             String termLabel = 'Term (months)';
             switch (selectedFrequency) {
@@ -633,14 +600,12 @@ class _LoansScreenState extends State<LoansScreen> {
                                 // Step 4: Review Live Preview Box
                                 Card(
                                   elevation: 0,
-                                  color: capBreached
-                                      ? Colors.red.withValues(alpha: 0.1)
-                                      : Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                                  color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
                                   margin: const EdgeInsets.only(bottom: 12),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                     side: BorderSide(
-                                      color: capBreached ? Colors.redAccent : Colors.grey.withValues(alpha: 0.3),
+                                      color: Colors.grey.withValues(alpha: 0.3),
                                     ),
                                   ),
                                   child: Padding(
@@ -650,23 +615,6 @@ class _LoansScreenState extends State<LoansScreen> {
                                       children: [
                                         const Text('Step 4: Review Loan Terms', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
                                         const SizedBox(height: 10),
-
-                                        if (capBreached) ...[
-                                          Row(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: const [
-                                              Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 18),
-                                              SizedBox(width: 6),
-                                              Expanded(
-                                                child: Text(
-                                                  'This loan exceeds the legal SEC/BSP limit for small loans. Lower the interest rate or fees to proceed legally.',
-                                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.redAccent),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 8),
-                                        ],
 
                                         if (p > 0) ...[
                                           Wrap(
@@ -710,24 +658,6 @@ class _LoansScreenState extends State<LoansScreen> {
                                                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF10B981))),
                                                 ],
                                               ),
-                                              Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: const [
-                                                      Text('True Cost per Month (EIR)', style: TextStyle(fontSize: 10, color: Colors.grey)),
-                                                      SizedBox(width: 2),
-                                                      Tooltip(
-                                                        message: 'EIR (Effective Interest Rate) — The real monthly cost including all fees and interest.',
-                                                        child: Icon(Icons.info_outline, size: 12, color: Colors.grey),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  Text('${monthlyEIR.toStringAsFixed(1)}% / mo',
-                                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0284C7))),
-                                                ],
-                                              ),
                                             ],
                                           ),
 
@@ -739,28 +669,6 @@ class _LoansScreenState extends State<LoansScreen> {
                                             spacing: 14,
                                             runSpacing: 4,
                                             children: [
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text('Basic Rate (NIR): ${monthlyNIR.toStringAsFixed(1)}%/mo', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                                  const SizedBox(width: 2),
-                                                  const Tooltip(
-                                                    message: 'NIR (Nominal Interest Rate) — Basic interest rate before upfront fees.',
-                                                    child: Icon(Icons.info_outline, size: 12, color: Colors.grey),
-                                                  ),
-                                                ],
-                                              ),
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Text('Yearly Rate (APR): ${apr.toStringAsFixed(1)}%/yr', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                                                  const SizedBox(width: 2),
-                                                  const Tooltip(
-                                                    message: 'APR (Annual Percentage Rate) — Yearly equivalent of all borrowing costs.',
-                                                    child: Icon(Icons.info_outline, size: 12, color: Colors.grey),
-                                                  ),
-                                                ],
-                                              ),
                                               Text('Total Fees: -${LoanUtils.formatCurrency(totalFees, state.currencyCode)}',
                                                   style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
                                               Text('Total Interest: ${LoanUtils.formatCurrency(totalInterest, state.currencyCode)}',
@@ -816,9 +724,7 @@ class _LoansScreenState extends State<LoansScreen> {
                               repaymentFrequency: selectedFrequency,
                               penaltyValue: penVal,
                               interestMethod: selectedMethod,
-                              totalFees: totalFees,
                               penaltyType: selectedPenaltyType,
-                              enforceCoveredCaps: enforceCoveredCaps,
                             );
 
                             if (err != null) {
