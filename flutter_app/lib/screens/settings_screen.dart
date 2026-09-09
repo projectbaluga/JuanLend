@@ -9,8 +9,113 @@ import '../widgets/responsive_container.dart';
 
 enum _BackupAction { saveFile, share, viewJson }
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  bool _dataBackupUnlocked = false;
+
+  Future<bool> _confirmIdentity(BuildContext context, AppState state) async {
+    if (_dataBackupUnlocked) return true;
+
+    final user = state.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be logged in to perform Data & Backup actions.')),
+      );
+      return false;
+    }
+
+    final passCtrl = TextEditingController();
+    String? errorMsg;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Confirm Identity'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Enter password for ${user.username} to access Data & Backup actions.',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  if (errorMsg != null) ...[
+                    Text(
+                      errorMsg!,
+                      style: const TextStyle(fontSize: 11, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  TextField(
+                    controller: passCtrl,
+                    obscureText: true,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Account Password',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) {
+                      final entered = passCtrl.text;
+                      if (user.verifyPassword(entered.trim())) {
+                        Navigator.pop(dialogCtx, true);
+                      } else {
+                        setDialogState(() {
+                          errorMsg = 'Incorrect password. Access denied.';
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx, false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final entered = passCtrl.text;
+                    if (user.verifyPassword(entered.trim())) {
+                      Navigator.pop(dialogCtx, true);
+                    } else {
+                      setDialogState(() {
+                        errorMsg = 'Incorrect password. Access denied.';
+                      });
+                    }
+                  },
+                  child: const Text('Verify & Proceed'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    passCtrl.dispose();
+
+    if (result == true) {
+      if (mounted) {
+        setState(() {
+          _dataBackupUnlocked = true;
+        });
+      }
+      return true;
+    }
+    return false;
+  }
 
   void _promptExportPassphrase(BuildContext context, AppState state, {required _BackupAction action}) {
     final passCtrl = TextEditingController();
@@ -423,14 +528,29 @@ class SettingsScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Data & Backup', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Data & Backup', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                        Icon(
+                          _dataBackupUnlocked ? Icons.lock_open : Icons.lock_outline,
+                          size: 16,
+                          color: _dataBackupUnlocked ? Colors.greenAccent : Colors.grey,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('Back up to File', style: TextStyle(fontSize: 13)),
                       subtitle: const Text('Save backup JSON (with optional encryption passphrase)', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.save_alt, size: 18),
-                      onTap: () => _promptExportPassphrase(context, state, action: _BackupAction.saveFile),
+                      onTap: () async {
+                        if (await _confirmIdentity(context, state)) {
+                          if (!context.mounted) return;
+                          _promptExportPassphrase(context, state, action: _BackupAction.saveFile);
+                        }
+                      },
                     ),
                     const Divider(height: 16),
                     ListTile(
@@ -438,7 +558,12 @@ class SettingsScreen extends StatelessWidget {
                       title: const Text('Share Backup', style: TextStyle(fontSize: 13)),
                       subtitle: const Text('Export encrypted or signed JSON file to other apps', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.share, size: 18),
-                      onTap: () => _promptExportPassphrase(context, state, action: _BackupAction.share),
+                      onTap: () async {
+                        if (await _confirmIdentity(context, state)) {
+                          if (!context.mounted) return;
+                          _promptExportPassphrase(context, state, action: _BackupAction.share);
+                        }
+                      },
                     ),
                     const Divider(height: 16),
                     ListTile(
@@ -447,15 +572,18 @@ class SettingsScreen extends StatelessWidget {
                       subtitle: const Text('Pick and import backup file with integrity & decryption checks', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.upload_file, size: 18),
                       onTap: () async {
-                        try {
-                          final content = await BackupService.pickAndReadBackup();
-                          if (content == null || !context.mounted) return;
-                          _handleRestoreContent(context, state, content);
-                        } catch (e) {
+                        if (await _confirmIdentity(context, state)) {
                           if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to read file: $e')),
-                          );
+                          try {
+                            final content = await BackupService.pickAndReadBackup();
+                            if (content == null || !context.mounted) return;
+                            _handleRestoreContent(context, state, content);
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to read file: $e')),
+                            );
+                          }
                         }
                       },
                     ),
@@ -465,7 +593,12 @@ class SettingsScreen extends StatelessWidget {
                       title: const Text('Export Data (JSON)', style: TextStyle(fontSize: 13)),
                       subtitle: const Text('Export borrowers and loans to JSON string', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.download, size: 18),
-                      onTap: () => _promptExportPassphrase(context, state, action: _BackupAction.viewJson),
+                      onTap: () async {
+                        if (await _confirmIdentity(context, state)) {
+                          if (!context.mounted) return;
+                          _promptExportPassphrase(context, state, action: _BackupAction.viewJson);
+                        }
+                      },
                     ),
                     const Divider(height: 16),
                     ListTile(
@@ -473,13 +606,16 @@ class SettingsScreen extends StatelessWidget {
                       title: const Text('Restore Sample Data', style: TextStyle(fontSize: 13)),
                       subtitle: const Text('Reset store and re-seed 3 sample borrowers & loans', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.restart_alt, size: 18),
-                      onTap: () {
-                        _showConfirmDialog(
-                          context: context,
-                          title: 'Restore Sample Data?',
-                          message: 'This will wipe current records and reload the original 3 sample borrowers and loans.',
-                          onConfirm: () => state.restoreSampleData(),
-                        );
+                      onTap: () async {
+                        if (await _confirmIdentity(context, state)) {
+                          if (!context.mounted) return;
+                          _showConfirmDialog(
+                            context: context,
+                            title: 'Restore Sample Data?',
+                            message: 'This will wipe current records and reload the original 3 sample borrowers and loans.',
+                            onConfirm: () => state.restoreSampleData(),
+                          );
+                        }
                       },
                     ),
                     const Divider(height: 16),
@@ -488,13 +624,16 @@ class SettingsScreen extends StatelessWidget {
                       title: const Text('Clear All Data', style: TextStyle(fontSize: 13, color: Colors.redAccent)),
                       subtitle: const Text('Wipe all local borrowers and loans', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       trailing: const Icon(Icons.delete_forever, size: 18, color: Colors.redAccent),
-                      onTap: () {
-                        _showConfirmDialog(
-                          context: context,
-                          title: 'Clear All Data?',
-                          message: 'Are you sure you want to delete all borrowers and loans? This action cannot be undone.',
-                          onConfirm: () => state.clearAllData(),
-                        );
+                      onTap: () async {
+                        if (await _confirmIdentity(context, state)) {
+                          if (!context.mounted) return;
+                          _showConfirmDialog(
+                            context: context,
+                            title: 'Clear All Data?',
+                            message: 'Are you sure you want to delete all borrowers and loans? This action cannot be undone.',
+                            onConfirm: () => state.clearAllData(),
+                          );
+                        }
                       },
                     ),
                   ],
