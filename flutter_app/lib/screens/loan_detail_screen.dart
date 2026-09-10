@@ -563,6 +563,67 @@ class LoanDetailScreen extends StatelessWidget {
     );
   }
 
+  void _showInstallmentReceipt({
+    required BuildContext context,
+    required Loan loan,
+    required Borrower borrower,
+    required AppState state,
+    required LoanStats stats,
+    required int installmentNo,
+  }) {
+    final allocations = LoanUtils.allocatePayments(
+      loan.schedule,
+      loan.payments,
+      penaltyAmount: stats.penaltyAmount,
+    );
+
+    final matchingPayments = loan.payments.where((p) {
+      final alloc = allocations[p.id];
+      return alloc != null && alloc.coveredInstallmentNos.contains(installmentNo);
+    }).toList();
+
+    if (matchingPayments.isEmpty) {
+      final soaText = ReceiptUtils.generateStatementOfAccount(
+        businessName: state.businessName,
+        borrower: borrower,
+        loan: loan,
+        stats: stats,
+        currencyCode: state.currencyCode,
+      );
+      _showTextDialog(
+        context: context,
+        title: 'Statement of Account (SOA)',
+        textContent: soaText,
+      );
+      return;
+    }
+
+    final selectedPayment = matchingPayments.last;
+    final curAlloc = allocations[selectedPayment.id];
+
+    final totalScheduled = stats.totalScheduled;
+    final payIdx = loan.payments.indexOf(selectedPayment);
+    final paymentsUpToSelected = loan.payments.sublist(0, payIdx + 1);
+    final paidUpToSelected = paymentsUpToSelected.fold(0.0, (sum, p) => sum + p.amount);
+    final runningBalance = max(0.0, LoanUtils.round2(totalScheduled + stats.penaltyAmount - paidUpToSelected));
+
+    final receiptText = ReceiptUtils.generatePaymentReceipt(
+      businessName: state.businessName,
+      borrower: borrower,
+      loan: loan,
+      payment: selectedPayment,
+      runningOutstandingBalance: runningBalance,
+      currencyCode: state.currencyCode,
+      allocation: curAlloc,
+    );
+
+    _showTextDialog(
+      context: context,
+      title: 'Official Payment Receipt (#$installmentNo)',
+      textContent: receiptText,
+    );
+  }
+
   void _showApplyCreditDialog(
     BuildContext context,
     Loan loan,
@@ -1251,7 +1312,31 @@ class LoanDetailScreen extends StatelessWidget {
                                     DataCell(Text(LoanUtils.formatCurrency(inst.paidAmount, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold, color: const Color(0xFF10B981)))),
                                     DataCell(Text(LoanUtils.formatCurrency(inst.remainingAmount, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, fontWeight: FontWeight.bold, color: inst.remainingAmount > 0 ? Colors.redAccent : Colors.grey))),
                                     DataCell(Text(LoanUtils.formatCurrency(inst.balance, state.currencyCode), style: TextStyle(fontSize: dynamicFontSize, color: Colors.grey))),
-                                    DataCell(AppBadge(text: inst.status, variant: inst.status)),
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          AppBadge(text: inst.status, variant: inst.status),
+                                          if (inst.status == 'paid') ...[
+                                            const SizedBox(width: 4),
+                                            IconButton(
+                                              icon: const Icon(Icons.receipt_long, size: 16),
+                                              padding: EdgeInsets.zero,
+                                              constraints: const BoxConstraints(),
+                                              tooltip: 'View Receipt',
+                                              onPressed: () => _showInstallmentReceipt(
+                                                context: context,
+                                                loan: loan,
+                                                borrower: borrower,
+                                                state: state,
+                                                stats: stats,
+                                                installmentNo: inst.installmentNo,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 );
                               }).toList(),
@@ -1307,7 +1392,29 @@ class LoanDetailScreen extends StatelessWidget {
                                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                                     ),
                                     const SizedBox(height: 2),
-                                    AppBadge(text: inst.status, variant: inst.status),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        AppBadge(text: inst.status, variant: inst.status),
+                                        if (inst.status == 'paid') ...[
+                                          const SizedBox(width: 4),
+                                          IconButton(
+                                            icon: const Icon(Icons.receipt_long, size: 16),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(),
+                                            tooltip: 'View Receipt',
+                                            onPressed: () => _showInstallmentReceipt(
+                                              context: context,
+                                              loan: loan,
+                                              borrower: borrower,
+                                              state: state,
+                                              stats: stats,
+                                              installmentNo: inst.installmentNo,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ],
                                 ),
                               ],

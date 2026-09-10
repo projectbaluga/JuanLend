@@ -126,8 +126,9 @@ void main() {
       expect(receipt, contains('OFFICIAL RECEIPT'));
       expect(receipt, contains('PINOY MICROLENDING'));
       expect(receipt, contains('Juan Dela Cruz'));
-      expect(receipt, contains('₱1,000.00'));
-      expect(receipt, contains('GCash'));
+      expect(receipt, contains('Amount Paid: ₱1,000.00'));
+      expect(receipt, contains('Payment Method: GCash'));
+      expect(receipt, contains('Remaining Balance: ₱4,000.00'));
     });
 
     test('ReceiptUtils generates Loan Summary & Disclosure', () {

@@ -102,12 +102,16 @@ class ReceiptUtils {
     buffer.writeln('Status: ${loan.status.toUpperCase()}');
     buffer.writeln('----------------------------------------');
     buffer.writeln('AMORTIZATION SCHEDULE:');
-    buffer.writeln('#   Due Date     Amount     Status');
+    final hdrNo = '#'.padRight(3);
+    final hdrDate = 'Due Date'.padRight(12);
+    final hdrAmt = 'Amount'.padRight(12);
+    final hdrStatus = 'Status';
+    buffer.writeln('$hdrNo $hdrDate $hdrAmt $hdrStatus');
 
     for (final inst in stats.scheduleWithStatus) {
       final noStr = inst.installmentNo.toString().padRight(3);
       final dateStr = LoanUtils.formatDate(inst.dueDate, 'yyyy-MM-dd').padRight(12);
-      final amtStr = LoanUtils.formatCurrency(inst.amount, cur).padRight(10);
+      final amtStr = LoanUtils.formatCurrency(inst.amount, cur).padRight(12);
       final statusStr = inst.status.toUpperCase();
       buffer.writeln('$noStr $dateStr $amtStr $statusStr');
     }
