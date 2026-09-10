@@ -105,82 +105,271 @@ class LoanDetailScreen extends StatelessWidget {
   }
 
   void _showEditLoanDialog(BuildContext context, Loan loan, AppState state) {
+    final hasPayments = loan.payments.isNotEmpty;
+
+    final principalCtrl = TextEditingController(text: loan.principal.toStringAsFixed(2));
+    final rateCtrl = TextEditingController(text: loan.interestRate.toString());
+    final termCtrl = TextEditingController(text: loan.termCount.toString());
     final purposeCtrl = TextEditingController(text: loan.purpose);
     final notesCtrl = TextEditingController(text: loan.notes);
     final dateCtrl = TextEditingController(text: loan.disbursementDate);
+
+    String selectedFrequency = loan.repaymentFrequency;
+    String selectedMethod = (loan.interestMethod == 'flat' || loan.interestMethod == 'one_time')
+        ? loan.interestMethod
+        : 'flat';
+    bool deductInterestUpfront = loan.upfrontDeductionType != 'none' && loan.upfrontDeductionValue > 0;
+
+    String? validationError;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            top: 16,
-            left: 16,
-            right: 16,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Edit Loan Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: purposeCtrl,
-                decoration: const InputDecoration(labelText: 'Purpose', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: dateCtrl,
-                decoration: const InputDecoration(labelText: 'Disbursement Date (YYYY-MM-DD)', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: notesCtrl,
-                decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final isMobile = MediaQuery.of(context).size.width < 700;
+
+            Widget buildFieldPair(Widget left, Widget right) {
+              if (isMobile) {
+                return Column(
+                  children: [
+                    left,
+                    const SizedBox(height: 10),
+                    right,
+                  ],
+                );
+              }
+              return Row(
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final updates = {
-                        'purpose': purposeCtrl.text.trim().isEmpty ? loan.purpose : purposeCtrl.text.trim(),
-                        'disbursement_date': dateCtrl.text.trim().isEmpty ? loan.disbursementDate : dateCtrl.text.trim(),
-                        'notes': notesCtrl.text.trim(),
-                        'updatedAt': DateTime.now().toIso8601String(),
-                      };
-
-                      try {
-                        await state.updateLoan(loan.id, updates);
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-
-                        if (!context.mounted) return;
-                        HapticFeedback.lightImpact();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Loan updated successfully')),
-                        );
-                      } catch (e) {
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to update loan: $e')),
-                        );
-                      }
-                    },
-                    child: const Text('Save Changes'),
-                  ),
+                  Expanded(child: left),
+                  const SizedBox(width: 10),
+                  Expanded(child: right),
                 ],
+              );
+            }
+
+            return Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.9,
               ),
-            ],
-          ),
+              padding: EdgeInsets.only(
+                top: 16,
+                left: 16,
+                right: 16,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Edit Loan Details', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+
+                    if (hasPayments) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: const [
+                            Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Term edits are restricted once payments exist. You can only edit Purpose, Disbursement Date, and Notes.',
+                                style: TextStyle(fontSize: 11, color: Colors.amber),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    if (validationError != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+                        ),
+                        child: Text(
+                          validationError!,
+                          style: const TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    buildFieldPair(
+                      TextField(
+                        controller: principalCtrl,
+                        enabled: !hasPayments,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(labelText: 'Principal Amount *', border: OutlineInputBorder()),
+                      ),
+                      TextField(
+                        controller: rateCtrl,
+                        enabled: !hasPayments,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: const InputDecoration(labelText: 'Interest Rate (%) *', border: OutlineInputBorder()),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    buildFieldPair(
+                      TextField(
+                        controller: termCtrl,
+                        enabled: !hasPayments,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Term Count *', border: OutlineInputBorder()),
+                      ),
+                      DropdownButtonFormField<String>(
+                        initialValue: selectedFrequency,
+                        decoration: const InputDecoration(labelText: 'Repayment Frequency', border: OutlineInputBorder()),
+                        items: const [
+                          DropdownMenuItem(value: 'daily', child: Text('Daily')),
+                          DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
+                          DropdownMenuItem(value: 'biweekly', child: Text('Bi-weekly')),
+                          DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
+                        ],
+                        onChanged: hasPayments ? null : (val) => setModalState(() => selectedFrequency = val ?? 'monthly'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedMethod,
+                      decoration: const InputDecoration(labelText: 'Interest Method', border: OutlineInputBorder()),
+                      items: const [
+                        DropdownMenuItem(value: 'flat', child: Text('Flat / Add-on ("5-6")')),
+                        DropdownMenuItem(value: 'one_time', child: Text('One-Time Payment')),
+                      ],
+                      onChanged: hasPayments ? null : (val) => setModalState(() => selectedMethod = val ?? 'flat'),
+                    ),
+                    const SizedBox(height: 10),
+
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Deduct Interest Upfront', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Interest is deducted from the disbursed cash; the borrower still repays the full principal.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      value: deductInterestUpfront,
+                      onChanged: hasPayments ? null : (val) => setModalState(() => deductInterestUpfront = val),
+                    ),
+                    const SizedBox(height: 10),
+
+                    TextField(
+                      controller: purposeCtrl,
+                      decoration: const InputDecoration(labelText: 'Purpose', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: dateCtrl,
+                      decoration: const InputDecoration(labelText: 'Disbursement Date (YYYY-MM-DD)', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: notesCtrl,
+                      decoration: const InputDecoration(labelText: 'Notes', border: OutlineInputBorder()),
+                    ),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () async {
+                            final purposeVal = purposeCtrl.text.trim().isEmpty ? loan.purpose : purposeCtrl.text.trim();
+                            final dateVal = dateCtrl.text.trim().isEmpty ? loan.disbursementDate : dateCtrl.text.trim();
+                            final notesVal = notesCtrl.text.trim();
+
+                            final updates = <String, dynamic>{
+                              'purpose': purposeVal,
+                              'disbursement_date': dateVal,
+                              'notes': notesVal,
+                              'updatedAt': DateTime.now().toIso8601String(),
+                            };
+
+                            if (!hasPayments) {
+                              final p = double.tryParse(principalCtrl.text.trim()) ?? 0.0;
+                              final r = double.tryParse(rateCtrl.text.trim()) ?? 0.0;
+                              final t = int.tryParse(termCtrl.text.trim()) ?? 1;
+
+                              final err = LoanUtils.validateLoanParams(
+                                principal: p,
+                                interestRate: r,
+                                termCount: t,
+                                repaymentFrequency: selectedFrequency,
+                                penaltyValue: loan.penaltyValue,
+                                interestMethod: selectedMethod,
+                                penaltyType: loan.penaltyType,
+                              );
+
+                              if (err != null) {
+                                setModalState(() => validationError = err);
+                                return;
+                              }
+
+                              final effectiveRate = deductInterestUpfront ? 0.0 : r;
+                              final interestDeduction = deductInterestUpfront ? LoanUtils.round2(p * r / 100.0) : 0.0;
+
+                              final newSchedule = LoanUtils.generateSchedule(
+                                p,
+                                effectiveRate,
+                                t,
+                                dateVal,
+                                repaymentFrequency: selectedFrequency,
+                                interestMethod: selectedMethod,
+                              );
+
+                              updates['principal'] = p;
+                              updates['interest_rate'] = r;
+                              updates['term_count'] = t;
+                              updates['term_months'] = selectedFrequency == 'monthly' ? t : 0;
+                              updates['repayment_frequency'] = selectedFrequency;
+                              updates['interest_method'] = selectedMethod;
+                              updates['upfront_deduction_type'] = deductInterestUpfront ? 'fixed' : 'none';
+                              updates['upfront_deduction_value'] = interestDeduction;
+                              updates['schedule'] = newSchedule.map((e) => e.toMap()).toList();
+                            }
+
+                            try {
+                              await state.updateLoan(loan.id, updates);
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+
+                              if (!context.mounted) return;
+                              HapticFeedback.lightImpact();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Loan updated successfully')),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to update loan: $e')),
+                              );
+                            }
+                          },
+                          child: const Text('Save Changes'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -594,8 +783,11 @@ class LoanDetailScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
             // Status Transitions & Action Bar
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Wrap(
                   spacing: 8,
@@ -657,7 +849,9 @@ class LoanDetailScreen extends StatelessWidget {
                       ),
                   ],
                 ),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     if (loan.status == 'pending') ...[
                       if (canApproveThisLoan)
@@ -709,7 +903,6 @@ class LoanDetailScreen extends StatelessWidget {
                           label: const Text('Approve', style: TextStyle(color: Colors.white)),
                         ),
                       if (isApprover) ...[
-                        const SizedBox(width: 8),
                         OutlinedButton.icon(
                           onPressed: () async {
                             try {
@@ -755,7 +948,6 @@ class LoanDetailScreen extends StatelessWidget {
                           label: const Text('Record Payment'),
                         ),
                       if (isApprover) ...[
-                        const SizedBox(width: 8),
                         OutlinedButton(
                           onPressed: () async {
                             try {
@@ -782,7 +974,6 @@ class LoanDetailScreen extends StatelessWidget {
                           },
                           child: const Text('Complete'),
                         ),
-                        const SizedBox(width: 8),
                         OutlinedButton(
                           style: OutlinedButton.styleFrom(foregroundColor: Colors.redAccent),
                           onPressed: () async {
