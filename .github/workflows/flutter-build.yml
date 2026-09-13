@@ -259,6 +259,19 @@ jobs:
       - name: Build macOS App (Release)
         run: flutter build macos --release --dart-define=APP_NAME="${{ inputs.app_name || vars.APP_NAME }}" --dart-define=APP_DESCRIPTION="${{ inputs.app_description || vars.APP_DESCRIPTION }}" --dart-define=APP_VERSION="${{ needs.version.outputs.version_name }}" --dart-define=APP_BUILD="${{ needs.version.outputs.build_number }}" --build-name="${{ needs.version.outputs.version_name }}" --build-number="${{ needs.version.outputs.build_number }}"
 
+      - name: Verify Universal Binary (x86_64 & arm64)
+        run: |
+          APP_BINARY="build/macos/Build/Products/Release/microlend.app/Contents/MacOS/microlend"
+          if [ ! -f "$APP_BINARY" ]; then
+            APP_BINARY="flutter_app/$APP_BINARY"
+          fi
+          ARCHS=$(lipo -archs "$APP_BINARY")
+          echo "Built architectures: $ARCHS"
+          if [[ "$ARCHS" != *"x86_64"* ]] || [[ "$ARCHS" != *"arm64"* ]]; then
+            echo "Error: Output binary is not universal (missing x86_64 or arm64). Found: $ARCHS"
+            exit 1
+          fi
+
       - name: Upload macOS Desktop Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -331,7 +344,7 @@ jobs:
     name: Publish GitHub Release
     if: github.ref_type == 'tag'
     needs: [version, android-build, ios-build, macos-build, windows-build]
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       contents: write
     steps:
@@ -361,8 +374,12 @@ jobs:
 
       - name: Zip macOS Build
         run: |
-          cd artifacts/macos
-          zip -r ../../${{ needs.version.outputs.app_slug }}-macos-${{ needs.version.outputs.version_name }}.zip .
+          TARGET_DIR="artifacts/macos"
+          if [ ! -d "$TARGET_DIR" ]; then
+            TARGET_DIR="flutter_app/artifacts/macos"
+          fi
+          cd "$TARGET_DIR"
+          ditto -c -k --sequesterRsrc --keepParent microlend.app "../../${{ needs.version.outputs.app_slug }}-macos-${{ needs.version.outputs.version_name }}.zip"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
