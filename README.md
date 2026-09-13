@@ -15,8 +15,20 @@ On every push to `main` and pull request, GitHub Actions automatically builds, a
   - `microlend-android-aab` (`app-release.aab`)
 - **iOS Job (`macos-latest`)**: Sets up Flutter, runs `flutter build ios --release --no-codesign`, and uploads the unsigned iOS build artifact:
   - `microlend-ios-unsigned`
+- **macOS Job (`macos-latest`)**: Builds universal binary (`x86_64` + `arm64`) release package targeting macOS 10.15+, packaged with full bundle metadata via `ditto`.
 
 To download the latest APK or build artifacts, navigate to the **Actions** tab on GitHub, click the latest workflow run, and scroll down to **Artifacts**.
+
+### 🍏 macOS Installation & First Launch Instructions
+1. Download `microlend-macos.zip` and extract it completely.
+2. Move `microlend.app` to your `/Applications` folder before launched.
+3. **Bypassing Gatekeeper (Unsigned Builds):**
+   Because the build is unsigned, macOS Gatekeeper may show a warning or launch error ("Runner cannot be opened on this version"). To bypass:
+   - **Method A:** Right-click (or Control-click) `microlend.app` in `/Applications` and select **Open**, then click **Open** in the prompt.
+   - **Method B:** Run the following command in Terminal:
+     ```bash
+     xattr -dr com.apple.quarantine /Applications/microlend.app
+     ```
 
 ### 🔑 App Licensing
 Full features (unlocking the 5-borrower limit) are enabled by entering the static master unlock code in the application Settings screen.

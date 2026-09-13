@@ -82,7 +82,16 @@ To unlock full features and unlimited borrowers:
 3. Enter the master unlock code (`MICROLEND-FULL-UNLOCK`) into the unlock input field.
 4. Click **Unlock**. Once unlocked, full functionality and unlimited borrower creation will be permanently enabled on your instance unless re-locked manually.
 
-## Part 11 — Recommendations for a Non-Techy Lender
+## Part 11 — macOS Installation & Gatekeeper Instructions
+When running MicroLend on macOS:
+1. Extract the downloaded `microlend-macos.zip` fully.
+2. Drag `microlend.app` to your `/Applications` directory.
+3. Because release artifacts are unsigned, macOS may block launch with a generic warning or error ("Runner cannot be opened on this version").
+4. To open the application:
+   - **Option 1:** Right-click (or Control-click) `microlend.app` in Finder, select **Open**, and confirm **Open**.
+   - **Option 2:** Open Terminal and execute: `xattr -dr com.apple.quarantine /Applications/microlend.app`.
+
+## Part 12 — Recommendations for a Non-Techy Lender
 - For traditional "5-6" lending, choose Flat / Add-on — most predictable and familiar.
 - Add an Upfront Deduction to collect part of your profit immediately.
 - Use Penalty to protect against late payers.
