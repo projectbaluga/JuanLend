@@ -11,7 +11,6 @@ class Loan {
   final int termMonths;
   final String repaymentFrequency; // 'daily', 'weekly', 'biweekly', 'semi_monthly', 'monthly'
   final String interestMethod; // 'flat', 'one_time', 'monthly_recurring'
-  final bool interestOnlyStart;
   final int termCount;
   final String purpose;
   final String status;
@@ -48,7 +47,6 @@ class Loan {
     required this.termMonths,
     this.repaymentFrequency = 'monthly',
     this.interestMethod = 'flat',
-    this.interestOnlyStart = false,
     int? termCount,
     required this.purpose,
     required this.status,
@@ -91,7 +89,6 @@ class Loan {
       termMonths: termM,
       repaymentFrequency: map['repayment_frequency']?.toString() ?? map['repaymentFrequency']?.toString() ?? 'monthly',
       interestMethod: map['interest_method']?.toString() ?? map['interestMethod']?.toString() ?? 'reducing',
-      interestOnlyStart: (map['interest_only_start'] as bool?) ?? (map['interestOnlyStart'] as bool?) ?? false,
       termCount: termC,
       purpose: map['purpose']?.toString() ?? '',
       status: map['status']?.toString() ?? 'pending',
@@ -141,7 +138,6 @@ class Loan {
       'term_months': termMonths,
       'repayment_frequency': repaymentFrequency,
       'interest_method': interestMethod,
-      'interest_only_start': interestOnlyStart,
       'term_count': termCount,
       'purpose': purpose,
       'status': status,
@@ -180,7 +176,6 @@ class Loan {
     int? termMonths,
     String? repaymentFrequency,
     String? interestMethod,
-    bool? interestOnlyStart,
     int? termCount,
     String? purpose,
     String? status,
@@ -217,7 +212,6 @@ class Loan {
       termMonths: termMonths ?? this.termMonths,
       repaymentFrequency: repaymentFrequency ?? this.repaymentFrequency,
       interestMethod: interestMethod ?? this.interestMethod,
-      interestOnlyStart: interestOnlyStart ?? this.interestOnlyStart,
       termCount: termCount ?? this.termCount,
       purpose: purpose ?? this.purpose,
       status: status ?? this.status,

@@ -119,7 +119,6 @@ class LoanDetailScreen extends StatelessWidget {
         ? loan.interestMethod
         : 'flat';
     bool deductInterestUpfront = loan.upfrontDeductionType != 'none' && loan.upfrontDeductionValue > 0;
-    bool interestOnlyStart = loan.interestOnlyStart;
 
     String? validationError;
 
@@ -260,15 +259,6 @@ class LoanDetailScreen extends StatelessWidget {
 
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Interest-only first period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      subtitle: const Text('Adds an interest-only installment prior to amortizing principal payments.', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                      value: interestOnlyStart,
-                      onChanged: hasPayments ? null : (val) => setModalState(() => interestOnlyStart = val),
-                    ),
-                    const SizedBox(height: 10),
-
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
                       title: const Text('Deduct Interest Upfront', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       subtitle: const Text('Interest is deducted from the disbursed cash; the borrower still repays the full principal.', style: TextStyle(fontSize: 11, color: Colors.grey)),
                       value: deductInterestUpfront,
@@ -343,7 +333,6 @@ class LoanDetailScreen extends StatelessWidget {
                                 dateVal,
                                 repaymentFrequency: selectedFrequency,
                                 interestMethod: selectedMethod,
-                                interestOnlyStart: interestOnlyStart,
                               );
 
                               updates['principal'] = p;
@@ -352,7 +341,6 @@ class LoanDetailScreen extends StatelessWidget {
                               updates['term_months'] = selectedFrequency == 'monthly' ? t : 0;
                               updates['repayment_frequency'] = selectedFrequency;
                               updates['interest_method'] = selectedMethod;
-                              updates['interest_only_start'] = interestOnlyStart;
                               updates['upfront_deduction_type'] = deductInterestUpfront ? 'fixed' : 'none';
                               updates['upfront_deduction_value'] = interestDeduction;
                               updates['schedule'] = newSchedule.map((e) => e.toMap()).toList();

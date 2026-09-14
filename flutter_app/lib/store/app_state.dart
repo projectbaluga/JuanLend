@@ -611,7 +611,6 @@ class AppState extends ChangeNotifier {
               disbursementDate,
               repaymentFrequency: loan.repaymentFrequency,
               interestMethod: loan.interestMethod,
-              interestOnlyStart: loan.interestOnlyStart,
             );
 
       final soloLoan = loan.copyWith(
@@ -719,7 +718,6 @@ class AppState extends ChangeNotifier {
             disbursementDate,
             repaymentFrequency: loan.repaymentFrequency,
             interestMethod: loan.interestMethod,
-            interestOnlyStart: loan.interestOnlyStart,
           );
 
     await store.updateItem('loans', loanId, {
@@ -884,7 +882,6 @@ class AppState extends ChangeNotifier {
       DateTime.now().toIso8601String().split('T')[0],
       repaymentFrequency: loan.repaymentFrequency,
       interestMethod: loan.interestMethod,
-      interestOnlyStart: loan.interestOnlyStart,
     );
 
     // Combine original remaining schedule / adjustments with new schedule
@@ -954,7 +951,6 @@ class AppState extends ChangeNotifier {
       disbDate,
       repaymentFrequency: loan.repaymentFrequency,
       interestMethod: loan.interestMethod,
-      interestOnlyStart: loan.interestOnlyStart,
     );
 
     await store.updateItem('loans', loanId, {
