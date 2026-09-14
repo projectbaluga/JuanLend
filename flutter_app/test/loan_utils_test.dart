@@ -122,6 +122,91 @@ void main() {
       expect(schedule[0].interest, 50.0);
       expect(schedule[0].dueDate, '2026-02-01');
     });
+
+    test('LoanUtils.generateSchedule handles semi-monthly recurring monthly interest with interestOnlyStart', () {
+      // ₱10,000 principal, 10%/month interest rate, 4 months, semi-monthly, with interest-only first period
+      final schedule = LoanUtils.generateSchedule(
+        10000.0,
+        10.0,
+        4,
+        '2026-06-01',
+        repaymentFrequency: 'semi_monthly',
+        interestMethod: 'monthly_recurring',
+        interestOnlyStart: true,
+      );
+
+      // 1 interest-only period + (4 months * 2 = 8 amortizing periods) = 9 rows total
+      expect(schedule.length, 9);
+
+      // Row 1: interest-only (interest = 10000 * 10% / 2 = 500, principal = 0)
+      expect(schedule[0].installmentNo, 1);
+      expect(schedule[0].dueDate, '2026-06-15');
+      expect(schedule[0].amount, 500.0);
+      expect(schedule[0].principal, 0.0);
+      expect(schedule[0].interest, 500.0);
+      expect(schedule[0].balance, 10000.0);
+
+      // Rows 2..9: 8 amortizing rows of ₱1,250 principal + ₱500 interest (₱1,750 each)
+      final expectedDueDates = [
+        '2026-06-30',
+        '2026-07-15',
+        '2026-07-31',
+        '2026-08-15',
+        '2026-08-31',
+        '2026-09-15',
+        '2026-09-30',
+        '2026-10-15',
+      ];
+
+      for (int i = 1; i <= 8; i++) {
+        final row = schedule[i];
+        expect(row.installmentNo, i + 1);
+        expect(row.dueDate, expectedDueDates[i - 1]);
+        expect(row.principal, 1250.0);
+        expect(row.interest, 500.0);
+        expect(row.amount, 1750.0);
+      }
+
+      // Zero final balance
+      expect(schedule.last.balance, 0.0);
+    });
+
+    test('LoanUtils.generateSchedule handles semi-monthly recurring monthly interest without interestOnlyStart', () {
+      final schedule = LoanUtils.generateSchedule(
+        10000.0,
+        10.0,
+        4,
+        '2026-06-01',
+        repaymentFrequency: 'semi_monthly',
+        interestMethod: 'monthly_recurring',
+        interestOnlyStart: false,
+      );
+
+      // 4 months * 2 = 8 amortizing periods
+      expect(schedule.length, 8);
+
+      final expectedDueDates = [
+        '2026-06-15',
+        '2026-06-30',
+        '2026-07-15',
+        '2026-07-31',
+        '2026-08-15',
+        '2026-08-31',
+        '2026-09-15',
+        '2026-09-30',
+      ];
+
+      for (int i = 0; i < 8; i++) {
+        final row = schedule[i];
+        expect(row.installmentNo, i + 1);
+        expect(row.dueDate, expectedDueDates[i]);
+        expect(row.principal, 1250.0);
+        expect(row.interest, 500.0);
+        expect(row.amount, 1750.0);
+      }
+
+      expect(schedule.last.balance, 0.0);
+    });
   });
 
   group('LoanUtils.getScheduleWithStatus', () {

@@ -430,6 +430,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             DropdownMenuItem(value: 'daily', child: Text('Daily')),
                             DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
                             DropdownMenuItem(value: 'biweekly', child: Text('Bi-weekly')),
+                            DropdownMenuItem(value: 'semi_monthly', child: Text('Semi-monthly')),
                             DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
                           ],
                           onChanged: (val) {
@@ -444,11 +445,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         const Text('Default Interest Method', style: TextStyle(fontSize: 13)),
                         DropdownButton<String>(
-                          value: (state.defaultInterestMethod == 'flat' || state.defaultInterestMethod == 'one_time')
+                          value: (state.defaultInterestMethod == 'flat' || state.defaultInterestMethod == 'one_time' || state.defaultInterestMethod == 'monthly_recurring')
                               ? state.defaultInterestMethod
                               : 'flat',
                           items: const [
                             DropdownMenuItem(value: 'flat', child: Text('Flat / Add-on ("5-6")')),
+                            DropdownMenuItem(value: 'monthly_recurring', child: Text('Recurring Monthly Interest')),
                             DropdownMenuItem(value: 'one_time', child: Text('One-Time Payment')),
                           ],
                           onChanged: (val) {
