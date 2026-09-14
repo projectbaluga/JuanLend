@@ -115,10 +115,11 @@ class LoanDetailScreen extends StatelessWidget {
     final dateCtrl = TextEditingController(text: loan.disbursementDate);
 
     String selectedFrequency = loan.repaymentFrequency;
-    String selectedMethod = (loan.interestMethod == 'flat' || loan.interestMethod == 'one_time')
+    String selectedMethod = (loan.interestMethod == 'flat' || loan.interestMethod == 'one_time' || loan.interestMethod == 'monthly_recurring')
         ? loan.interestMethod
         : 'flat';
     bool deductInterestUpfront = loan.upfrontDeductionType != 'none' && loan.upfrontDeductionValue > 0;
+    bool interestOnlyStart = loan.interestOnlyStart;
 
     String? validationError;
 
@@ -237,6 +238,7 @@ class LoanDetailScreen extends StatelessWidget {
                           DropdownMenuItem(value: 'daily', child: Text('Daily')),
                           DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
                           DropdownMenuItem(value: 'biweekly', child: Text('Bi-weekly')),
+                          DropdownMenuItem(value: 'semi_monthly', child: Text('Semi-monthly (15th & end of month)')),
                           DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
                         ],
                         onChanged: hasPayments ? null : (val) => setModalState(() => selectedFrequency = val ?? 'monthly'),
@@ -249,9 +251,19 @@ class LoanDetailScreen extends StatelessWidget {
                       decoration: const InputDecoration(labelText: 'Interest Method', border: OutlineInputBorder()),
                       items: const [
                         DropdownMenuItem(value: 'flat', child: Text('Flat / Add-on ("5-6")')),
+                        DropdownMenuItem(value: 'monthly_recurring', child: Text('Recurring Monthly Interest')),
                         DropdownMenuItem(value: 'one_time', child: Text('One-Time Payment')),
                       ],
                       onChanged: hasPayments ? null : (val) => setModalState(() => selectedMethod = val ?? 'flat'),
+                    ),
+                    const SizedBox(height: 10),
+
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Interest-only first period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Adds an interest-only installment prior to amortizing principal payments.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                      value: interestOnlyStart,
+                      onChanged: hasPayments ? null : (val) => setModalState(() => interestOnlyStart = val),
                     ),
                     const SizedBox(height: 10),
 
@@ -331,6 +343,7 @@ class LoanDetailScreen extends StatelessWidget {
                                 dateVal,
                                 repaymentFrequency: selectedFrequency,
                                 interestMethod: selectedMethod,
+                                interestOnlyStart: interestOnlyStart,
                               );
 
                               updates['principal'] = p;
@@ -339,6 +352,7 @@ class LoanDetailScreen extends StatelessWidget {
                               updates['term_months'] = selectedFrequency == 'monthly' ? t : 0;
                               updates['repayment_frequency'] = selectedFrequency;
                               updates['interest_method'] = selectedMethod;
+                              updates['interest_only_start'] = interestOnlyStart;
                               updates['upfront_deduction_type'] = deductInterestUpfront ? 'fixed' : 'none';
                               updates['upfront_deduction_value'] = interestDeduction;
                               updates['schedule'] = newSchedule.map((e) => e.toMap()).toList();

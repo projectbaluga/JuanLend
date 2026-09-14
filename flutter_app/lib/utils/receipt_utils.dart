@@ -96,8 +96,8 @@ class ReceiptUtils {
     buffer.writeln('Purpose: ${loan.purpose}');
     buffer.writeln('Principal: ${LoanUtils.formatCurrency(loan.principal, cur)}');
     buffer.writeln('Interest Rate: ${loan.interestRate}%');
-    buffer.writeln('Frequency: ${loan.repaymentFrequency.toUpperCase()}');
-    buffer.writeln('Interest Method: ${loan.interestMethod.replaceAll('_', ' ').toUpperCase()}');
+    buffer.writeln('Frequency: ${_formatFrequency(loan.repaymentFrequency)}');
+    buffer.writeln('Interest Method: ${_formatInterestMethod(loan.interestMethod)}');
     buffer.writeln('Disbursement Date: ${LoanUtils.formatDate(loan.disbursementDate)}');
     buffer.writeln('Status: ${loan.status.toUpperCase()}');
     buffer.writeln('----------------------------------------');
@@ -133,6 +133,36 @@ class ReceiptUtils {
     buffer.writeln('========================================');
 
     return buffer.toString();
+  }
+
+  static String _formatFrequency(String freq) {
+    switch (freq) {
+      case 'semi_monthly':
+        return 'SEMI-MONTHLY (15TH & END OF MONTH)';
+      case 'daily':
+        return 'DAILY';
+      case 'weekly':
+        return 'WEEKLY';
+      case 'biweekly':
+        return 'BI-WEEKLY';
+      case 'monthly':
+        return 'MONTHLY';
+      default:
+        return freq.replaceAll('_', ' ').toUpperCase();
+    }
+  }
+
+  static String _formatInterestMethod(String method) {
+    switch (method) {
+      case 'monthly_recurring':
+        return 'RECURRING MONTHLY INTEREST';
+      case 'flat':
+        return 'FLAT / ADD-ON ("5-6")';
+      case 'one_time':
+        return 'ONE-TIME PAYMENT';
+      default:
+        return method.replaceAll('_', ' ').toUpperCase();
+    }
   }
 
   static String generateDisclosureStatement({
@@ -184,7 +214,7 @@ class ReceiptUtils {
     buffer.writeln('4. INTEREST & REPAYMENT TERMS:');
     buffer.writeln('   a. Interest Rate:                  ${loan.interestRate}%');
     buffer.writeln('   b. Total Interest Amount:          ${LoanUtils.formatCurrency(totalScheduledInterest, cur)}');
-    buffer.writeln('   c. Repayment Frequency:            ${loan.repaymentFrequency.toUpperCase()}');
+    buffer.writeln('   c. Repayment Frequency:            ${_formatFrequency(loan.repaymentFrequency)}');
     buffer.writeln('   d. Number of Installments:         ${loan.termCount}');
     buffer.writeln('   e. Total Amount Repayable:         ${LoanUtils.formatCurrency(totalRepayable, cur)}');
     buffer.writeln('----------------------------------------------------');

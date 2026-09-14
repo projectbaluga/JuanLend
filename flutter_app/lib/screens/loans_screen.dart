@@ -47,11 +47,12 @@ class _LoansScreenState extends State<LoansScreen> {
 
     String selectedBorrowerId = initialBorrowerId ?? borrowers.first.id;
     String selectedFrequency = state.defaultRepaymentFrequency;
-    String selectedMethod = (state.defaultInterestMethod == 'flat' || state.defaultInterestMethod == 'one_time')
+    String selectedMethod = (state.defaultInterestMethod == 'flat' || state.defaultInterestMethod == 'one_time' || state.defaultInterestMethod == 'monthly_recurring')
         ? state.defaultInterestMethod
         : 'flat';
     String selectedPenaltyType = state.defaultPenaltyType;
     bool deductInterestUpfront = false;
+    bool interestOnlyStart = false;
 
     final principalCtrl = TextEditingController();
     final rateCtrl = TextEditingController(text: state.defaultInterestRate.toString());
@@ -123,6 +124,7 @@ class _LoansScreenState extends State<LoansScreen> {
                     dateCtrl.text.trim(),
                     repaymentFrequency: selectedFrequency,
                     interestMethod: selectedMethod,
+                    interestOnlyStart: interestOnlyStart,
                   )
                 : <ScheduleInstallment>[];
 
@@ -137,6 +139,9 @@ class _LoansScreenState extends State<LoansScreen> {
                 break;
               case 'biweekly':
                 termLabel = 'Term (bi-weeks)';
+                break;
+              case 'semi_monthly':
+                termLabel = 'Term (half-months)';
                 break;
               case 'monthly':
               default:
@@ -238,9 +243,11 @@ class _LoansScreenState extends State<LoansScreen> {
                                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                             decoration: InputDecoration(
                                               labelText: 'Interest Rate (%) *',
-                                              helperText: (selectedMethod == 'reducing' || selectedMethod == 'interest_only')
-                                                  ? '% per year (per annum)'
-                                                  : '% total for the whole term',
+                                              helperText: selectedMethod == 'monthly_recurring'
+                                                  ? '% per month'
+                                                  : ((selectedMethod == 'reducing' || selectedMethod == 'interest_only')
+                                                      ? '% per year (per annum)'
+                                                      : '% total for the whole term'),
                                               border: const OutlineInputBorder(),
                                             ),
                                             onChanged: (_) => setModalState(() {}),
@@ -271,6 +278,7 @@ class _LoansScreenState extends State<LoansScreen> {
                                               DropdownMenuItem(value: 'daily', child: Text('Daily')),
                                               DropdownMenuItem(value: 'weekly', child: Text('Weekly')),
                                               DropdownMenuItem(value: 'biweekly', child: Text('Bi-weekly')),
+                                              DropdownMenuItem(value: 'semi_monthly', child: Text('Semi-monthly (15th & end of month)')),
                                               DropdownMenuItem(value: 'monthly', child: Text('Monthly')),
                                             ],
                                             onChanged: (val) {
@@ -301,6 +309,10 @@ class _LoansScreenState extends State<LoansScreen> {
                                                     child: Text('Flat / Add-on ("5-6")', overflow: TextOverflow.ellipsis),
                                                   ),
                                                   DropdownMenuItem(
+                                                    value: 'monthly_recurring',
+                                                    child: Text('Recurring Monthly Interest', overflow: TextOverflow.ellipsis),
+                                                  ),
+                                                  DropdownMenuItem(
                                                     value: 'one_time',
                                                     child: Text('One-Time Payment — single lump-sum repayment at the end', overflow: TextOverflow.ellipsis),
                                                   ),
@@ -311,6 +323,14 @@ class _LoansScreenState extends State<LoansScreen> {
                                               ),
                                             ),
                                           ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        SwitchListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          title: const Text('Interest-only first period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                          subtitle: const Text('Adds an interest-only installment prior to amortizing principal payments.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                          value: interestOnlyStart,
+                                          onChanged: (val) => setModalState(() => interestOnlyStart = val),
                                         ),
                                         const SizedBox(height: 10),
                                         SwitchListTile(
@@ -734,6 +754,7 @@ class _LoansScreenState extends State<LoansScreen> {
                               dateCtrl.text.trim(),
                               repaymentFrequency: selectedFrequency,
                               interestMethod: selectedMethod,
+                              interestOnlyStart: interestOnlyStart,
                             );
 
                             final newLoan = Loan(
@@ -744,6 +765,7 @@ class _LoansScreenState extends State<LoansScreen> {
                               termMonths: selectedFrequency == 'monthly' ? t : 0,
                               repaymentFrequency: selectedFrequency,
                               interestMethod: selectedMethod,
+                              interestOnlyStart: interestOnlyStart,
                               termCount: t,
                               purpose: purpose,
                               status: 'pending',
