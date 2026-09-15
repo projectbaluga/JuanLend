@@ -649,47 +649,47 @@ class LoanUtils {
     final stats = getLoanStats(loan, referenceDate);
     final penalty = stats.penaltyAmount;
 
-    ScheduleInstallment? target;
+    double interestDue = 0.0;
     for (final inst in stats.scheduleWithStatus) {
-      if (inst.remainingAmount > kPaymentEpsilon) {
-        target = inst;
+      final intPaid = min(inst.paidAmount, inst.interest);
+      final intRem = max(0.0, round2(inst.interest - intPaid));
+      if (intRem > kPaymentEpsilon) {
+        interestDue = intRem;
         break;
       }
     }
 
-    double interestDue = 0.0;
-    if (target != null) {
-      final intRem = max(0.0, target.interest - target.paidAmount);
-      interestDue = min(target.remainingAmount, intRem);
-    } else if (loan.schedule.isNotEmpty) {
-      interestDue = loan.schedule.last.interest;
-    } else {
-      final p = max(0.0, loan.principal);
-      final rate = max(0.0, loan.interestRate);
-      if (loan.interestMethod == 'monthly_recurring') {
-        int periodsPerMonth = 1;
-        switch (loan.repaymentFrequency) {
-          case 'semi_monthly':
-            periodsPerMonth = 2;
-            break;
-          case 'weekly':
-            periodsPerMonth = 4;
-            break;
-          case 'biweekly':
-            periodsPerMonth = 2;
-            break;
-          case 'daily':
-            periodsPerMonth = 30;
-            break;
-          case 'monthly':
-          default:
-            periodsPerMonth = 1;
-            break;
-        }
-        interestDue = (p * (rate / 100.0)) / periodsPerMonth;
+    if (interestDue <= kPaymentEpsilon) {
+      if (loan.schedule.isNotEmpty) {
+        interestDue = loan.schedule.last.interest;
       } else {
-        final n = max(1, loan.termCount);
-        interestDue = (p * (rate / 100.0)) / n;
+        final p = max(0.0, loan.principal);
+        final rate = max(0.0, loan.interestRate);
+        if (loan.interestMethod == 'monthly_recurring') {
+          int periodsPerMonth = 1;
+          switch (loan.repaymentFrequency) {
+            case 'semi_monthly':
+              periodsPerMonth = 2;
+              break;
+            case 'weekly':
+              periodsPerMonth = 4;
+              break;
+            case 'biweekly':
+              periodsPerMonth = 2;
+              break;
+            case 'daily':
+              periodsPerMonth = 30;
+              break;
+            case 'monthly':
+            default:
+              periodsPerMonth = 1;
+              break;
+          }
+          interestDue = (p * (rate / 100.0)) / periodsPerMonth;
+        } else {
+          final n = max(1, loan.termCount);
+          interestDue = (p * (rate / 100.0)) / n;
+        }
       }
     }
 
