@@ -318,6 +318,31 @@ void main() {
     });
   });
 
+  group('LoanUtils.computeActiveInterestDue', () {
+    test('computes active interest due for unpaid active installment', () {
+      final schedule = LoanUtils.generateSchedule(10000.0, 10.0, 4, '2026-06-01', repaymentFrequency: 'semi_monthly', interestMethod: 'monthly_recurring');
+      final loan = Loan(
+        id: 'l_due_test',
+        borrowerId: 'b1',
+        principal: 10000.0,
+        interestRate: 10.0,
+        termMonths: 2,
+        repaymentFrequency: 'semi_monthly',
+        interestMethod: 'monthly_recurring',
+        termCount: 4,
+        purpose: 'Active Interest Due Test',
+        status: 'active',
+        disbursementDate: '2026-06-01',
+        schedule: schedule,
+        payments: [],
+        notes: '',
+      );
+
+      final activeDue = LoanUtils.computeActiveInterestDue(loan, DateTime.parse('2026-06-15'));
+      expect(activeDue, 500.0);
+    });
+  });
+
   group('Upfront Fees & Penalty Tests', () {
     test('calculateTotalUpfrontFees handles percent_per_day daily service fee', () {
       // ₱1,000 principal, 0.5% per day service fee for 15 days
