@@ -867,9 +867,20 @@ class AppState extends ChangeNotifier {
     await recordPayment(loanId, payment);
 
     final updatedLoan = loans.firstWhere((l) => l.id == loanId);
+    final stats = LoanUtils.getLoanStats(updatedLoan);
+
+    // Outstanding principal = principal minus total principal paid across payment allocations
+    final allocations = LoanUtils.allocatePayments(
+      updatedLoan.schedule,
+      updatedLoan.payments,
+      penaltyAmount: stats.penaltyAmount,
+    );
+    final totalPrinPaid = allocations.values.fold(0.0, (sum, alloc) => sum + alloc.principalPortion);
+    final outstandingPrincipal = max(0.0, LoanUtils.round2(updatedLoan.principal - totalPrinPaid));
+
     final newTermCount = updatedLoan.termCount + extensionPeriods;
     final extensionFee = LoanUtils.calculateFeeAmount(
-      updatedLoan.principal,
+      outstandingPrincipal > 0 ? outstandingPrincipal : updatedLoan.principal,
       extensionFeeType,
       extensionFeeValue,
       termCount: extensionPeriods,
@@ -878,13 +889,13 @@ class AppState extends ChangeNotifier {
 
     final newServiceFeeValue = updatedLoan.serviceFeeValue + extensionFee;
 
-    // Compute start date from payment date or last schedule due date
+    // Anchor start date to the LAST existing schedule due date so appended installments continue chronologically
     DateTime startDate;
     try {
-      if (payment.date.isNotEmpty) {
-        startDate = DateTime.parse(payment.date);
-      } else if (updatedLoan.schedule.isNotEmpty) {
+      if (updatedLoan.schedule.isNotEmpty) {
         startDate = DateTime.parse(updatedLoan.schedule.last.dueDate);
+      } else if (payment.date.isNotEmpty) {
+        startDate = DateTime.parse(payment.date);
       } else {
         startDate = DateTime.now();
       }
@@ -913,15 +924,20 @@ class AppState extends ChangeNotifier {
     }
 
     final totalExtInstallments = max(1, extensionPeriods * (updatedLoan.interestMethod == 'monthly_recurring' ? periodsPerMonth : 1));
-    final p = updatedLoan.principal;
     final rate = updatedLoan.interestRate;
 
     double interestPerInstallment = 0.0;
     if (updatedLoan.interestMethod == 'monthly_recurring') {
-      interestPerInstallment = (p * (rate / 100.0)) / periodsPerMonth;
+      interestPerInstallment = (outstandingPrincipal * (rate / 100.0)) / periodsPerMonth;
     } else {
-      interestPerInstallment = (p * (rate / 100.0)) / totalExtInstallments;
+      interestPerInstallment = (outstandingPrincipal * (rate / 100.0)) / max(1, updatedLoan.termCount);
     }
+
+    final bool isGenuinelyInterestOnly = updatedLoan.interestMethod == 'interest_only' ||
+        updatedLoan.interestMethod == 'one_time' ||
+        (updatedLoan.schedule.isNotEmpty &&
+            updatedLoan.schedule.length > 1 &&
+            updatedLoan.schedule.first.principal == 0.0);
 
     final List<ScheduleInstallment> appendedSchedule = [];
     final currentBaseCount = updatedLoan.schedule.length;
@@ -931,9 +947,9 @@ class AppState extends ChangeNotifier {
       final dueDateStr = LoanUtils.formatDate(dueDate.toIso8601String().split('T')[0], 'yyyy-MM-dd');
 
       final bool isLast = i == totalExtInstallments;
-      final double prin = isLast ? LoanUtils.round2(p) : 0.0;
+      final double prin = (isGenuinelyInterestOnly && isLast) ? LoanUtils.round2(outstandingPrincipal) : 0.0;
       final double instInterest = LoanUtils.round2(interestPerInstallment);
-      final double bal = isLast ? 0.0 : LoanUtils.round2(p);
+      final double bal = (isGenuinelyInterestOnly && !isLast) ? LoanUtils.round2(outstandingPrincipal) : 0.0;
 
       appendedSchedule.add(ScheduleInstallment(
         installmentNo: currentBaseCount + i,

@@ -815,5 +815,63 @@ void main() {
 
       expect(updated.principal, 10000.0); // Loan principal remains intact
     });
+
+    test('flat semi-monthly loan handles partial payments and interest-only rollover correctly', () async {
+      await appState.createUser('officer_flat_sm', 'officer123', 'officer');
+      await appState.login('officer_flat_sm', 'officer123');
+
+      final schedule = LoanUtils.generateSchedule(10000.0, 10.0, 4, '2026-06-01', repaymentFrequency: 'semi_monthly', interestMethod: 'flat');
+      final loan = Loan(
+        id: 'loan_flat_sm_1',
+        borrowerId: 'b1',
+        principal: 10000.0,
+        interestRate: 10.0,
+        termMonths: 2,
+        repaymentFrequency: 'semi_monthly',
+        interestMethod: 'flat',
+        termCount: 4,
+        purpose: 'Flat Semi-Monthly Partial & Rollover Test',
+        status: 'active',
+        disbursementDate: '2026-06-01',
+        schedule: schedule,
+        payments: [],
+        notes: '',
+      );
+      await appState.addLoan(loan);
+
+      // Record a partial payment of 300
+      final partialPay = Payment(
+        id: 'pay_flat_partial',
+        date: '2026-06-10',
+        amount: 300.0,
+        method: 'Cash',
+        note: 'Partial payment',
+      );
+      await appState.recordPayment('loan_flat_sm_1', partialPay);
+
+      var updated = appState.loans.firstWhere((l) => l.id == 'loan_flat_sm_1');
+      expect(updated.payments.length, 1);
+
+      final activeIntDue = LoanUtils.computeActiveInterestDue(updated);
+      expect(activeIntDue, greaterThan(0.0));
+
+      final rolloverPay = Payment(
+        id: 'pay_flat_rollover',
+        date: '2026-06-15',
+        amount: activeIntDue,
+        method: 'GCash / E-Wallet',
+        note: 'Interest-Only Rollover',
+      );
+
+      await appState.recordInterestOnlyAndRollover('loan_flat_sm_1', payment: rolloverPay, extensionPeriods: 1);
+
+      updated = appState.loans.firstWhere((l) => l.id == 'loan_flat_sm_1');
+      expect(updated.payments.length, 2);
+      expect(updated.status, 'active');
+
+      final stats = LoanUtils.getLoanStats(updated);
+      expect(stats.outstandingBalance, greaterThan(0.0));
+      expect(updated.schedule.length, greaterThan(4));
+    });
   });
 }
