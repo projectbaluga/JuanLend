@@ -428,7 +428,14 @@ class LoanDetailScreen extends StatelessWidget {
                             setModalState(() {
                               isInterestOnlyRollover = val;
                               if (val) {
-                                amountCtrl.text = activeInterestDue.toStringAsFixed(2);
+                                DateTime payDate;
+                                try {
+                                  payDate = DateTime.parse(dateCtrl.text.trim());
+                                } catch (_) {
+                                  payDate = DateTime.now();
+                                }
+                                final dueAmt = LoanUtils.computeActiveInterestDue(loan, payDate);
+                                amountCtrl.text = dueAmt.toStringAsFixed(2);
                               } else {
                                 amountCtrl.clear();
                               }
@@ -522,7 +529,13 @@ class LoanDetailScreen extends StatelessWidget {
                               lastDate: DateTime(2100),
                             );
                             if (picked != null) {
-                              dateCtrl.text = picked.toIso8601String().split('T')[0];
+                              setModalState(() {
+                                dateCtrl.text = picked.toIso8601String().split('T')[0];
+                                if (isInterestOnlyRollover) {
+                                  final dueAmt = LoanUtils.computeActiveInterestDue(loan, picked);
+                                  amountCtrl.text = dueAmt.toStringAsFixed(2);
+                                }
+                              });
                             }
                           },
                   ),
@@ -546,18 +559,41 @@ class LoanDetailScreen extends StatelessWidget {
                             ? null
                             : () async {
                                 final amt = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
-                                if (amt <= 0) {
-                                  setModalState(() {
-                                    errorMessage = 'Please enter a valid amount greater than 0';
-                                  });
-                                  return;
+                                DateTime payDate;
+                                try {
+                                  payDate = DateTime.parse(dateCtrl.text.trim());
+                                } catch (_) {
+                                  payDate = DateTime.now();
                                 }
+                                final expectedDue = LoanUtils.computeActiveInterestDue(loan, payDate);
 
-                                if (amt > maxAmount + 0.001) {
-                                  setModalState(() {
-                                    errorMessage = 'Amount cannot exceed balance due (${LoanUtils.formatCurrency(maxAmount, state.currencyCode)})';
-                                  });
-                                  return;
+                                if (isInterestOnlyRollover) {
+                                  if (amt <= 0) {
+                                    setModalState(() {
+                                      errorMessage = 'Please enter a valid interest amount greater than 0';
+                                    });
+                                    return;
+                                  }
+                                  if ((amt - expectedDue).abs() > 0.01) {
+                                    setModalState(() {
+                                      errorMessage = 'Interest-only payment must equal due interest (${LoanUtils.formatCurrency(expectedDue, state.currencyCode)})';
+                                    });
+                                    return;
+                                  }
+                                } else {
+                                  if (amt <= 0) {
+                                    setModalState(() {
+                                      errorMessage = 'Please enter a valid amount greater than 0';
+                                    });
+                                    return;
+                                  }
+
+                                  if (amt > maxAmount + 0.001) {
+                                    setModalState(() {
+                                      errorMessage = 'Amount cannot exceed balance due (${LoanUtils.formatCurrency(maxAmount, state.currencyCode)})';
+                                    });
+                                    return;
+                                  }
                                 }
 
                                 setModalState(() {
