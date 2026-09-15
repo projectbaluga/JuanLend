@@ -52,7 +52,6 @@ class _LoansScreenState extends State<LoansScreen> {
         : 'flat';
     String selectedPenaltyType = state.defaultPenaltyType;
     bool deductInterestUpfront = false;
-    bool interestOnlyStart = false;
 
     final principalCtrl = TextEditingController();
     final rateCtrl = TextEditingController(text: state.defaultInterestRate.toString());
@@ -124,7 +123,6 @@ class _LoansScreenState extends State<LoansScreen> {
                     dateCtrl.text.trim(),
                     repaymentFrequency: selectedFrequency,
                     interestMethod: selectedMethod,
-                    interestOnlyStart: interestOnlyStart,
                   )
                 : <ScheduleInstallment>[];
 
@@ -323,14 +321,6 @@ class _LoansScreenState extends State<LoansScreen> {
                                               ),
                                             ),
                                           ],
-                                        ),
-                                        const SizedBox(height: 10),
-                                        SwitchListTile(
-                                          contentPadding: EdgeInsets.zero,
-                                          title: const Text('Interest-only first period', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                                          subtitle: const Text('Adds an interest-only installment prior to amortizing principal payments.', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                          value: interestOnlyStart,
-                                          onChanged: (val) => setModalState(() => interestOnlyStart = val),
                                         ),
                                         const SizedBox(height: 10),
                                         SwitchListTile(
@@ -754,7 +744,6 @@ class _LoansScreenState extends State<LoansScreen> {
                               dateCtrl.text.trim(),
                               repaymentFrequency: selectedFrequency,
                               interestMethod: selectedMethod,
-                              interestOnlyStart: interestOnlyStart,
                             );
 
                             final newLoan = Loan(
@@ -765,7 +754,6 @@ class _LoansScreenState extends State<LoansScreen> {
                               termMonths: selectedFrequency == 'monthly' ? t : 0,
                               repaymentFrequency: selectedFrequency,
                               interestMethod: selectedMethod,
-                              interestOnlyStart: interestOnlyStart,
                               termCount: t,
                               purpose: purpose,
                               status: 'pending',

@@ -212,7 +212,14 @@ class LoanUtils {
       case 'biweekly':
         return startDate.add(Duration(days: periodIndex * 14));
       case 'semi_monthly':
-        final startHalf = startDate.day <= 15 ? 0 : 1;
+        final int startHalf;
+        if (startDate.day < 15) {
+          startHalf = 0;
+        } else if (startDate.day == 15) {
+          startHalf = 1;
+        } else {
+          startHalf = 2;
+        }
         final totalHalfSteps = startHalf + (periodIndex - 1);
         final monthOffset = totalHalfSteps ~/ 2;
         final currentHalf = totalHalfSteps % 2;
@@ -250,7 +257,6 @@ class LoanUtils {
     String disbursementDate, {
     String repaymentFrequency = 'monthly',
     String interestMethod = 'flat',
-    bool interestOnlyStart = false,
   }) {
     final p = max(0.0, principal);
     final rate = max(0.0, interestRate);
@@ -305,24 +311,9 @@ class LoanUtils {
       final interestPerPeriod = (p * (rate / 100.0)) / periodsPerMonth;
       final principalPerPeriod = p / amortizingPeriods;
       double balance = p;
-      int currentInstNo = 1;
-
-      if (interestOnlyStart) {
-        final dueDate = calculateDueDate(startDate, repaymentFrequency, currentInstNo);
-        final dueDateStr = DateFormat('yyyy-MM-dd').format(dueDate);
-        schedule.add(ScheduleInstallment(
-          installmentNo: currentInstNo,
-          dueDate: dueDateStr,
-          amount: round2(interestPerPeriod),
-          principal: 0.0,
-          interest: round2(interestPerPeriod),
-          balance: round2(balance),
-        ));
-        currentInstNo++;
-      }
 
       for (int i = 1; i <= amortizingPeriods; i++) {
-        final dueDate = calculateDueDate(startDate, repaymentFrequency, currentInstNo);
+        final dueDate = calculateDueDate(startDate, repaymentFrequency, i);
         final dueDateStr = DateFormat('yyyy-MM-dd').format(dueDate);
 
         double prin = (i == amortizingPeriods) ? round2(balance) : round2(principalPerPeriod);
@@ -335,14 +326,13 @@ class LoanUtils {
         }
 
         schedule.add(ScheduleInstallment(
-          installmentNo: currentInstNo,
+          installmentNo: i,
           dueDate: dueDateStr,
           amount: round2(prin + instInterest),
           principal: round2(prin),
           interest: round2(instInterest),
           balance: max(0.0, round2(balance)),
         ));
-        currentInstNo++;
       }
 
       return schedule;
@@ -354,24 +344,9 @@ class LoanUtils {
     final principalPerPeriod = p / n;
     final interestPerPeriod = totalInterest / n;
     double balance = p;
-    int currentInstNo = 1;
-
-    if (interestOnlyStart) {
-      final dueDate = calculateDueDate(startDate, repaymentFrequency, currentInstNo);
-      final dueDateStr = DateFormat('yyyy-MM-dd').format(dueDate);
-      schedule.add(ScheduleInstallment(
-        installmentNo: currentInstNo,
-        dueDate: dueDateStr,
-        amount: round2(interestPerPeriod),
-        principal: 0.0,
-        interest: round2(interestPerPeriod),
-        balance: round2(balance),
-      ));
-      currentInstNo++;
-    }
 
     for (int i = 1; i <= n; i++) {
-      final dueDate = calculateDueDate(startDate, repaymentFrequency, currentInstNo);
+      final dueDate = calculateDueDate(startDate, repaymentFrequency, i);
       final dueDateStr = DateFormat('yyyy-MM-dd').format(dueDate);
 
       double prin = (i == n) ? round2(balance) : round2(principalPerPeriod);
@@ -384,14 +359,13 @@ class LoanUtils {
       }
 
       schedule.add(ScheduleInstallment(
-        installmentNo: currentInstNo,
+        installmentNo: i,
         dueDate: dueDateStr,
         amount: round2(prin + instInterest),
         principal: round2(prin),
         interest: round2(instInterest),
         balance: max(0.0, round2(balance)),
       ));
-      currentInstNo++;
     }
 
     return schedule;
@@ -669,6 +643,57 @@ class LoanUtils {
   static double computeEarlyPayoffAmount(Loan loan, [DateTime? asOfDate]) {
     final stats = getLoanStats(loan, asOfDate);
     return stats.totalDueWithPenalty;
+  }
+
+  static double computeActiveInterestDue(Loan loan, [DateTime? referenceDate]) {
+    final stats = getLoanStats(loan, referenceDate);
+    final penalty = stats.penaltyAmount;
+
+    ScheduleInstallment? target;
+    for (final inst in stats.scheduleWithStatus) {
+      if (inst.remainingAmount > kPaymentEpsilon) {
+        target = inst;
+        break;
+      }
+    }
+
+    double interestDue = 0.0;
+    if (target != null) {
+      final intRem = max(0.0, target.interest - target.paidAmount);
+      interestDue = min(target.remainingAmount, intRem);
+    } else if (loan.schedule.isNotEmpty) {
+      interestDue = loan.schedule.last.interest;
+    } else {
+      final p = max(0.0, loan.principal);
+      final rate = max(0.0, loan.interestRate);
+      if (loan.interestMethod == 'monthly_recurring') {
+        int periodsPerMonth = 1;
+        switch (loan.repaymentFrequency) {
+          case 'semi_monthly':
+            periodsPerMonth = 2;
+            break;
+          case 'weekly':
+            periodsPerMonth = 4;
+            break;
+          case 'biweekly':
+            periodsPerMonth = 2;
+            break;
+          case 'daily':
+            periodsPerMonth = 30;
+            break;
+          case 'monthly':
+          default:
+            periodsPerMonth = 1;
+            break;
+        }
+        interestDue = (p * (rate / 100.0)) / periodsPerMonth;
+      } else {
+        final n = max(1, loan.termCount);
+        interestDue = (p * (rate / 100.0)) / n;
+      }
+    }
+
+    return round2(interestDue + penalty);
   }
 
   static String? validateLoanParams({
