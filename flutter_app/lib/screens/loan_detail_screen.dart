@@ -383,14 +383,18 @@ class LoanDetailScreen extends StatelessWidget {
     Borrower borrower,
     AppState state,
   ) {
+    final stats = LoanUtils.getLoanStats(loan);
+    final maxAmount = stats.totalDueWithPenalty;
+    final activeInterestDue = LoanUtils.computeActiveInterestDue(loan);
+
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     final dateCtrl = TextEditingController(text: DateTime.now().toIso8601String().split('T')[0]);
+    final rolloverPeriodsCtrl = TextEditingController(text: '1');
+    final rolloverFeeCtrl = TextEditingController(text: '0');
     String selectedMethod = 'Cash';
 
-    final stats = LoanUtils.getLoanStats(loan);
-    final maxAmount = stats.totalDueWithPenalty;
-
+    bool isInterestOnlyRollover = false;
     bool isSaving = false;
     String? errorMessage;
 
@@ -413,13 +417,35 @@ class LoanDetailScreen extends StatelessWidget {
                 children: [
                   const Text('Record Repayment', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 12),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Interest-only payment (roll over principal)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Borrower pays only interest + penalty; principal is not reduced and loan term is extended.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                    value: isInterestOnlyRollover,
+                    onChanged: isSaving
+                        ? null
+                        : (val) {
+                            setModalState(() {
+                              isInterestOnlyRollover = val;
+                              if (val) {
+                                amountCtrl.text = activeInterestDue.toStringAsFixed(2);
+                              } else {
+                                amountCtrl.clear();
+                              }
+                              errorMessage = null;
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 10),
                   TextField(
                     controller: amountCtrl,
-                    enabled: !isSaving,
+                    enabled: !isSaving && !isInterestOnlyRollover,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       labelText: 'Amount *',
-                      helperText: 'Max amount due: ${LoanUtils.formatCurrency(maxAmount, state.currencyCode)}',
+                      helperText: isInterestOnlyRollover
+                          ? 'Interest + Penalty due: ${LoanUtils.formatCurrency(activeInterestDue, state.currencyCode)}'
+                          : 'Max amount due: ${LoanUtils.formatCurrency(maxAmount, state.currencyCode)}',
                       errorText: errorMessage,
                       border: const OutlineInputBorder(),
                     ),
@@ -431,6 +457,38 @@ class LoanDetailScreen extends StatelessWidget {
                       }
                     },
                   ),
+                  if (isInterestOnlyRollover) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: rolloverPeriodsCtrl,
+                            enabled: !isSaving,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Rollover Periods *',
+                              helperText: 'Periods to extend term',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: rolloverFeeCtrl,
+                            enabled: !isSaving,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: 'Rollover Fee (${LoanUtils.defaultCurrencyCode})',
+                              helperText: 'Optional extension fee',
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     initialValue: selectedMethod,
@@ -513,38 +571,74 @@ class LoanDetailScreen extends StatelessWidget {
                                   date: dateCtrl.text.trim(),
                                   amount: amt,
                                   method: selectedMethod,
-                                  note: noteCtrl.text.trim(),
+                                  note: isInterestOnlyRollover
+                                      ? 'Interest-Only Rollover • ${noteCtrl.text.trim()}'.trim()
+                                      : noteCtrl.text.trim(),
                                 );
 
-                                await state.recordPayment(loan.id, payment);
-                                if (!ctx.mounted) return;
-                                Navigator.pop(ctx);
+                                try {
+                                  if (isInterestOnlyRollover) {
+                                    final periods = int.tryParse(rolloverPeriodsCtrl.text.trim()) ?? 1;
+                                    final feeVal = double.tryParse(rolloverFeeCtrl.text.trim()) ?? 0.0;
 
-                                final updatedLoan = state.loans.firstWhere((l) => l.id == loan.id, orElse: () => loan);
-                                final updatedStats = LoanUtils.getLoanStats(updatedLoan);
-                                final allocations = LoanUtils.allocatePayments(
-                                  updatedLoan.schedule,
-                                  updatedLoan.payments,
-                                  penaltyAmount: updatedStats.penaltyAmount,
-                                );
-                                final curAlloc = allocations[payment.id];
+                                    if (periods <= 0) {
+                                      setModalState(() {
+                                        isSaving = false;
+                                        errorMessage = 'Rollover periods must be at least 1';
+                                      });
+                                      return;
+                                    }
 
-                                final receiptText = ReceiptUtils.generatePaymentReceipt(
-                                  businessName: state.businessName,
-                                  borrower: borrower,
-                                  loan: updatedLoan,
-                                  payment: payment,
-                                  runningOutstandingBalance: updatedStats.outstandingBalance,
-                                  currencyCode: state.currencyCode,
-                                  allocation: curAlloc,
-                                );
+                                    await state.recordInterestOnlyAndRollover(
+                                      loan.id,
+                                      payment: payment,
+                                      extensionPeriods: periods,
+                                      extensionFeeValue: feeVal,
+                                    );
+                                  } else {
+                                    await state.recordPayment(loan.id, payment);
+                                  }
 
-                                if (!context.mounted) return;
-                                _showTextDialog(
-                                  context: context,
-                                  title: 'Official Payment Receipt',
-                                  textContent: receiptText,
-                                );
+                                  if (!ctx.mounted) return;
+                                  Navigator.pop(ctx);
+
+                                  final updatedLoan = state.loans.firstWhere((l) => l.id == loan.id, orElse: () => loan);
+                                  final updatedStats = LoanUtils.getLoanStats(updatedLoan);
+                                  final allocations = LoanUtils.allocatePayments(
+                                    updatedLoan.schedule,
+                                    updatedLoan.payments,
+                                    penaltyAmount: updatedStats.penaltyAmount,
+                                  );
+                                  final curAlloc = allocations[payment.id];
+
+                                  final receiptText = ReceiptUtils.generatePaymentReceipt(
+                                    businessName: state.businessName,
+                                    borrower: borrower,
+                                    loan: updatedLoan,
+                                    payment: payment,
+                                    runningOutstandingBalance: updatedStats.outstandingBalance,
+                                    currencyCode: state.currencyCode,
+                                    allocation: curAlloc,
+                                  );
+
+                                  if (!context.mounted) return;
+                                  if (isInterestOnlyRollover) {
+                                    HapticFeedback.lightImpact();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Interest-only payment recorded and loan rolled over successfully.')),
+                                    );
+                                  }
+                                  _showTextDialog(
+                                    context: context,
+                                    title: 'Official Payment Receipt',
+                                    textContent: receiptText,
+                                  );
+                                } catch (e) {
+                                  setModalState(() {
+                                    isSaving = false;
+                                    errorMessage = e.toString().replaceAll('StateError: ', '').replaceAll('ArgumentError: ', '');
+                                  });
+                                }
                               },
                         child: isSaving
                             ? const SizedBox(

@@ -768,5 +768,52 @@ void main() {
       expect(rolledOverLoan.termCount, 8);
       expect(rolledOverLoan.serviceFeeValue, 150.0);
     });
+
+    test('recordInterestOnlyAndRollover records payment, keeps principal unchanged, increases termCount and appends schedule', () async {
+      await appState.createUser('officer_patubo', 'officer123', 'officer');
+      await appState.login('officer_patubo', 'officer123');
+
+      final initialSchedule = LoanUtils.generateSchedule(10000.0, 10.0, 4, '2026-06-01', repaymentFrequency: 'semi_monthly', interestMethod: 'monthly_recurring');
+      final loan = Loan(
+        id: 'loan_patubo_1',
+        borrowerId: 'b1',
+        principal: 10000.0,
+        interestRate: 10.0,
+        termMonths: 2,
+        repaymentFrequency: 'semi_monthly',
+        interestMethod: 'monthly_recurring',
+        termCount: 4,
+        purpose: 'Patubo Interest-Only Test',
+        status: 'active',
+        disbursementDate: '2026-06-01',
+        schedule: initialSchedule,
+        payments: [],
+        notes: '',
+      );
+      await appState.addLoan(loan);
+
+      final activeInt = LoanUtils.computeActiveInterestDue(loan);
+      expect(activeInt, 500.0);
+
+      final payment = Payment(
+        id: 'pay_patubo_1',
+        date: '2026-06-15',
+        amount: 500.0,
+        method: 'Cash',
+        note: 'Interest-Only Rollover • Patubo',
+      );
+
+      await appState.recordInterestOnlyAndRollover('loan_patubo_1', payment: payment, extensionPeriods: 1, extensionFeeValue: 50.0);
+
+      final updated = appState.loans.firstWhere((l) => l.id == 'loan_patubo_1');
+      expect(updated.principal, 10000.0);
+      expect(updated.payments.length, 1);
+      expect(updated.payments.first.amount, 500.0);
+      expect(updated.termCount, 5);
+      expect(updated.serviceFeeValue, 50.0);
+      expect(updated.schedule.length, 10); // 8 initial semi-monthly installments + 2 extended installments (1 month * 2 periodsPerMonth) = 10 total installments
+
+      expect(updated.principal, 10000.0); // Loan principal remains intact
+    });
   });
 }

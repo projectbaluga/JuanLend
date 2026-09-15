@@ -13,6 +13,7 @@ import '../models/credit_application.dart';
 import '../models/loan.dart';
 import '../models/payment.dart';
 import '../models/payment_log_entry.dart';
+import '../models/schedule_installment.dart';
 import '../models/user.dart';
 import '../utils/license_verifier.dart';
 import '../utils/loan_utils.dart';
@@ -838,6 +839,125 @@ class AppState extends ChangeNotifier {
     if (statsAfter.totalPaid >= totalRequired && existingLoan.status == 'active') {
       await store.updateItem('loans', loanId, {'status': 'completed'});
     }
+
+    notifyListeners();
+  }
+
+  Future<void> recordInterestOnlyAndRollover(
+    String loanId, {
+    required Payment payment,
+    required int extensionPeriods,
+    double extensionFeeValue = 0.0,
+    String extensionFeeType = 'fixed',
+  }) async {
+    if (_currentUser == null || (_currentUser!.role != 'officer' && _currentUser!.role != 'approver')) {
+      throw StateError('Unauthorized: Role "${_currentUser?.role ?? "unauthenticated"}" cannot perform interest-only rollover.');
+    }
+
+    final loan = loans.firstWhere((l) => l.id == loanId);
+    if (loan.status != 'active') {
+      throw ArgumentError('Cannot rollover loan with status "${loan.status}". Only active loans can be rolled over.');
+    }
+
+    if (extensionPeriods <= 0) {
+      throw ArgumentError('Extension periods must be greater than 0.');
+    }
+
+    // Record the interest-only payment first
+    await recordPayment(loanId, payment);
+
+    final updatedLoan = loans.firstWhere((l) => l.id == loanId);
+    final newTermCount = updatedLoan.termCount + extensionPeriods;
+    final extensionFee = LoanUtils.calculateFeeAmount(
+      updatedLoan.principal,
+      extensionFeeType,
+      extensionFeeValue,
+      termCount: extensionPeriods,
+      frequency: updatedLoan.repaymentFrequency,
+    );
+
+    final newServiceFeeValue = updatedLoan.serviceFeeValue + extensionFee;
+
+    // Compute start date from payment date or last schedule due date
+    DateTime startDate;
+    try {
+      if (payment.date.isNotEmpty) {
+        startDate = DateTime.parse(payment.date);
+      } else if (updatedLoan.schedule.isNotEmpty) {
+        startDate = DateTime.parse(updatedLoan.schedule.last.dueDate);
+      } else {
+        startDate = DateTime.now();
+      }
+    } catch (_) {
+      startDate = DateTime.now();
+    }
+
+    int periodsPerMonth = 1;
+    switch (updatedLoan.repaymentFrequency) {
+      case 'semi_monthly':
+        periodsPerMonth = 2;
+        break;
+      case 'weekly':
+        periodsPerMonth = 4;
+        break;
+      case 'biweekly':
+        periodsPerMonth = 2;
+        break;
+      case 'daily':
+        periodsPerMonth = 30;
+        break;
+      case 'monthly':
+      default:
+        periodsPerMonth = 1;
+        break;
+    }
+
+    final totalExtInstallments = max(1, extensionPeriods * (updatedLoan.interestMethod == 'monthly_recurring' ? periodsPerMonth : 1));
+    final p = updatedLoan.principal;
+    final rate = updatedLoan.interestRate;
+
+    double interestPerInstallment = 0.0;
+    if (updatedLoan.interestMethod == 'monthly_recurring') {
+      interestPerInstallment = (p * (rate / 100.0)) / periodsPerMonth;
+    } else {
+      interestPerInstallment = (p * (rate / 100.0)) / totalExtInstallments;
+    }
+
+    final List<ScheduleInstallment> appendedSchedule = [];
+    final currentBaseCount = updatedLoan.schedule.length;
+
+    for (int i = 1; i <= totalExtInstallments; i++) {
+      final dueDate = LoanUtils.calculateDueDate(startDate, updatedLoan.repaymentFrequency, i);
+      final dueDateStr = LoanUtils.formatDate(dueDate.toIso8601String().split('T')[0], 'yyyy-MM-dd');
+
+      final bool isLast = i == totalExtInstallments;
+      final double prin = isLast ? LoanUtils.round2(p) : 0.0;
+      final double instInterest = LoanUtils.round2(interestPerInstallment);
+      final double bal = isLast ? 0.0 : LoanUtils.round2(p);
+
+      appendedSchedule.add(ScheduleInstallment(
+        installmentNo: currentBaseCount + i,
+        dueDate: dueDateStr,
+        amount: LoanUtils.round2(prin + instInterest),
+        principal: prin,
+        interest: instInterest,
+        balance: max(0.0, bal),
+      ));
+    }
+
+    final newScheduleList = [
+      ...updatedLoan.schedule,
+      ...appendedSchedule,
+    ];
+
+    await store.updateItem('loans', loanId, {
+      'term_count': newTermCount,
+      'term_months': updatedLoan.repaymentFrequency == 'monthly' ? newTermCount : updatedLoan.termMonths,
+      'service_fee_type': 'fixed',
+      'service_fee_value': newServiceFeeValue,
+      'schedule': newScheduleList.map((e) => e.toMap()).toList(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
 
     notifyListeners();
   }

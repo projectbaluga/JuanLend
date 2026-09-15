@@ -30,6 +30,10 @@ class ReceiptUtils {
     buffer.writeln('----------------------------------------');
     buffer.writeln('Amount Paid: ${LoanUtils.formatCurrency(payment.amount, cur)}');
     buffer.writeln('Payment Method: ${payment.method}');
+    if (payment.note.contains('Interest-Only Rollover')) {
+      buffer.writeln('Type: INTEREST-ONLY ROLLOVER (PATUBO)');
+      buffer.writeln('Term Extended: ${loan.termCount} period(s) total');
+    }
     if (payment.note.isNotEmpty) {
       buffer.writeln('Note: ${payment.note}');
     }
